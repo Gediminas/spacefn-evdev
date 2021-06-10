@@ -4,7 +4,8 @@ DIRNAME="${BASH_SOURCE%[/\\]*}"
 
 trap ctrl_c INT
 ctrl_c() {
-    echo "spacefn_forever: Trapped CTRL-C"
+    echo -e "\nspacefn_forever: Trapped CTRL-C"
+    killall spacefn > /dev/null 2>&1
     exit
 }
 
@@ -12,9 +13,20 @@ PID=0
 killall spacefn > /dev/null 2>&1
 
 while true; do
-  "$DIRNAME"/spacefn "$1"
+  echo "==============================="
+  echo "(RE)STARTED"
+
+  ./spacefn_lnx_apple.sh
+
+  ("$DIRNAME/spacefn" "$1")&
   PID=$!
-  inotifywait "$DIRNAME"/spacefn
-  kill -SIGTERM $PID
+  echo "PID: $PID"
+
+  # echo "Wathing: $DIRNAME/spacefn"
+  inotifywait "$DIRNAME/spacefn"
+
+  # echo "Killing $PID"
+  # kill -SIGTERM $PID
+  killall spacefn > /dev/null 2>&1
   sleep 1
 done

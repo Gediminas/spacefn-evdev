@@ -39,13 +39,15 @@ unsigned int key_map(unsigned int code, bool *bCtrl) {
         case KEY_C:           *bCtrl = true; return KEY_C;
         case KEY_V:           *bCtrl = true; return KEY_V;
 
-        case KEY_A:           return KEY_F13;
-        case KEY_S:           return KEY_F14;
-        case KEY_D:           return KEY_F15;
-        case KEY_F:           return KEY_F16;
+        case KEY_A:           return KEY_F15;
+        case KEY_S:           return KEY_F16;
+        case KEY_D:           return KEY_F17;
+        case KEY_F:           return KEY_F18;
 
         case KEY_W:           *bCtrl = true; return KEY_S;
         case KEY_E:           *bCtrl = true; return KEY_TAB;
+        case KEY_T:           return KEY_PAGEUP;
+        case KEY_G:           return KEY_PAGEDOWN;
 
         //case KEY_SEMICOLON:
         //case KEY_COMMA:       return KEY_PAGEDOWN;
