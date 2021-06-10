@@ -10,10 +10,12 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
-unsigned int key_map(unsigned int code) {
+unsigned int key_map(unsigned int code, bool *bCtrl) {
+    *bCtrl = false;
     switch (code) {
         case KEY_BRIGHTNESSDOWN:    // my magical escape button
             exit(0);
@@ -32,6 +34,18 @@ unsigned int key_map(unsigned int code) {
         case KEY_I:           return KEY_END;
         case KEY_O:           return KEY_HOME;
         case KEY_P:           return KEY_END;
+
+        case KEY_X:           *bCtrl = true; return KEY_X;
+        case KEY_C:           *bCtrl = true; return KEY_C;
+        case KEY_V:           *bCtrl = true; return KEY_V;
+
+        case KEY_A:           return KEY_F13;
+        case KEY_S:           return KEY_F14;
+        case KEY_D:           return KEY_F15;
+        case KEY_F:           return KEY_F16;
+
+        case KEY_W:           *bCtrl = true; return KEY_S;
+        case KEY_E:           *bCtrl = true; return KEY_TAB;
 
         //case KEY_SEMICOLON:
         //case KEY_COMMA:       return KEY_PAGEDOWN;
@@ -129,8 +143,9 @@ static int read_one_key(struct input_event *ev) {
         return -1;
     }
 
-    if (blacklist(ev->code))
+    if (blacklist(ev->code)) {
         return -1;
+    }
 
     return 0;
 }
@@ -193,9 +208,17 @@ static void state_decide(void) {    // {{{2
         }
 
         if (ev.value == V_RELEASE && buffer_remove(ev.code)) {
-            unsigned int code = key_map(ev.code);
+            bool bCtrl = false;
+            unsigned int code = key_map(ev.code, &bCtrl);
+            /* printf("SPACEcode: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE); */
+            if (bCtrl) {
+                send_key(KEY_LEFTCTRL, V_PRESS);
+            }
             send_key(code, V_PRESS);
             send_key(code, V_RELEASE);
+            if (bCtrl) {
+                send_key(KEY_LEFTCTRL, V_RELEASE);
+            }
             state = SHIFT;
             return;
         }
@@ -203,10 +226,18 @@ static void state_decide(void) {    // {{{2
 
     printf("timed out\n");
     for (int i=0; i<n_buffer; i++) {
-        unsigned int code = key_map(buffer[i]);
-        if (!code)
+        bool bCtrl = false;
+        unsigned int code = key_map(buffer[i], &bCtrl);
+        if (!code) {
             code = buffer[i];
+        }
+        if (bCtrl) {
+            send_key(KEY_LEFTCTRL, V_PRESS);
+        }
         send_key(code, V_PRESS);
+        if (bCtrl) {
+            send_key(KEY_LEFTCTRL, V_RELEASE);
+        }
     }
     state = SHIFT;
 }
@@ -226,14 +257,21 @@ static void state_shift(void) {
         if (ev.code == KEY_SPACE)
             continue;
 
-        unsigned int code = key_map(ev.code);
+        bool bCtrl = false;
+        unsigned int code = key_map(ev.code, &bCtrl);
         if (code) {
             if (ev.value == V_PRESS)
                 buffer_append(code);
             else if (ev.value == V_RELEASE)
                 buffer_remove(code);
 
+            if (bCtrl && ev.value == V_PRESS) {
+                send_key(KEY_LEFTCTRL, V_PRESS);
+            }
             send_key(code, ev.value);
+            if (bCtrl && ev.value == V_RELEASE) {
+                send_key(KEY_LEFTCTRL, V_RELEASE);
+            }
         } else {
             send_key(ev.code, ev.value);
         }
