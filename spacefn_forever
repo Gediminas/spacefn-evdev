@@ -16,8 +16,6 @@ while true; do
   echo "==============================="
   echo "(RE)STARTED"
 
-  ./spacefn_lnx_apple.sh
-
   ("$DIRNAME/spacefn" "$1")&
   PID=$!
   echo "PID: $PID"
