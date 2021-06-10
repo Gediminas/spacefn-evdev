@@ -30,8 +30,8 @@ unsigned int key_map(unsigned int code, bool *bCtrl) {
         case KEY_M:           return KEY_BACKSPACE;
 
         case KEY_Y:           return KEY_SPACE;
-        case KEY_U:           return KEY_HOME;
-        case KEY_I:           return KEY_END;
+        case KEY_U:           *bCtrl = true; return KEY_LEFT;
+        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
         case KEY_O:           return KEY_HOME;
         case KEY_P:           return KEY_END;
 
