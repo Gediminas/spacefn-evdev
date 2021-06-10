@@ -11,49 +11,50 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
+// https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
 unsigned int key_map(unsigned int code) {
     switch (code) {
         case KEY_BRIGHTNESSDOWN:    // my magical escape button
             exit(0);
 
-        case KEY_J:
-            return KEY_LEFT;
-        case KEY_K:
-            return KEY_DOWN;
-        case KEY_L:
-            return KEY_UP;
-        case KEY_SEMICOLON:
-            return KEY_RIGHT;
+        case KEY_H:           return KEY_LEFT;
+        case KEY_J:           return KEY_DOWN;
+        case KEY_K:           return KEY_UP;
+        case KEY_L:           return KEY_RIGHT;
 
-        case KEY_M:
-            return KEY_HOME;
-        case KEY_COMMA:
-            return KEY_PAGEDOWN;
-        case KEY_DOT:
-            return KEY_PAGEUP;
-        case KEY_SLASH:
-            return KEY_END;
+        case KEY_B:           return KEY_ENTER;
+        case KEY_N:           return KEY_ESC;
+        case KEY_M:           return KEY_BACKSPACE;
 
-        case KEY_B:
-            return KEY_SPACE;
+        case KEY_Y:           return KEY_SPACE;
+        case KEY_U:           return KEY_HOME;
+        case KEY_I:           return KEY_END;
+        case KEY_O:           return KEY_HOME;
+        case KEY_P:           return KEY_END;
+
+        //case KEY_SEMICOLON:
+        //case KEY_COMMA:       return KEY_PAGEDOWN;
+        //case KEY_DOT:         return KEY_PAGEUP;
+        //case KEY_SLASH:       return KEY_END;
+
     }
     return 0;
 }
 
 // Blacklist keys for which I have a mapping, to try and train myself out of using them
 int blacklist(unsigned int code) {
-    switch (code) {
-        case KEY_UP:
-        case KEY_DOWN:
-        case KEY_RIGHT:
-        case KEY_LEFT:
-        case KEY_HOME:
-        case KEY_END:
-        case KEY_PAGEUP:
-        case KEY_PAGEDOWN:
-            return 1;
-    }
+    // switch (code) {
+    //     case KEY_UP:
+    //     case KEY_DOWN:
+    //     case KEY_RIGHT:
+    //     case KEY_LEFT:
+    //     case KEY_HOME:
+    //     case KEY_END:
+    //     case KEY_PAGEUP:
+    //     case KEY_PAGEDOWN:
+    //         return 1;
+    // }
     return 0;
 }
 
