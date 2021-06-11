@@ -28,6 +28,12 @@ enum {
     LAYER_DOT,
 } layer = LAYER_STD;
 
+// Global device handles {{{1
+struct libevdev *idev;
+struct libevdev_uinput *odev;
+int fd;
+bool bApple = false;
+
 
 int write_log(const char *format, ...)
 {
@@ -51,8 +57,8 @@ unsigned int key_map_modifier(unsigned int code) {
     //printf("code: %d\n", code);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
-        case KEY_LEFTALT:   return KEY_LEFTCTRL;
-        case KEY_LEFTMETA:  return KEY_LEFTALT;
+        case KEY_LEFTALT:   return bApple ? KEY_LEFTALT  : KEY_LEFTCTRL;
+        case KEY_LEFTMETA:  return bApple ? KEY_LEFTCTRL : KEY_LEFTALT;
         case KEY_RIGHTMETA: return KEY_RIGHTSHIFT; //Apple CMD
         case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
         case KEY_CAPSLOCK:  return KEY_ESC;
@@ -146,11 +152,6 @@ int blacklist(unsigned int code) {
     return 0;
 }
 
-
-// Global device handles {{{1
-struct libevdev *idev;
-struct libevdev_uinput *odev;
-int fd;
 
 // Ordered unique key buffer {{{1
 #define MAX_BUFFER 8
@@ -432,6 +433,8 @@ int main(int argc, char **argv) {   // {{{1
         perror("open input");
         return 1;
     }
+
+    bApple = (argc > 1) ? argv[2] : false;
 
     int err = libevdev_new_from_fd(fd, &idev);
     if (err) {

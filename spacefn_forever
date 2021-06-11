@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 
 DIRNAME="${BASH_SOURCE%[/\\]*}"
+PID=0
+# killall spacefn > /dev/null 2>&1
 
 trap ctrl_c INT
 ctrl_c() {
     echo -e "\nspacefn_forever: Trapped CTRL-C"
-    killall spacefn > /dev/null 2>&1
+    # killall spacefn > /dev/null 2>&1
+    kill -SIGTERM $PID
     exit
 }
-
-PID=0
-killall spacefn > /dev/null 2>&1
 
 while true; do
   echo "==============================="
   echo "(RE)STARTED"
 
-  ("$DIRNAME/spacefn" "$1")&
+  ("$DIRNAME/spacefn" "$@")&
   PID=$!
   echo "PID: $PID"
 
@@ -24,7 +24,7 @@ while true; do
   inotifywait "$DIRNAME/spacefn"
 
   # echo "Killing $PID"
-  # kill -SIGTERM $PID
-  killall spacefn > /dev/null 2>&1
+  # killall spacefn > /dev/null 2>&1
+  kill -SIGTERM $PID
   sleep 1
 done
