@@ -11,6 +11,25 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdarg.h>
+#include <time.h>
+#include <sys/time.h>
+
+int write_log(const char *format, ...)
+{
+    struct timeval tmnow;
+    struct tm *tm;
+    char buf[30], usec_buf[6];
+    gettimeofday(&tmnow, NULL);
+    tm = localtime(&tmnow.tv_sec);
+    strftime(buf, 30, "%Y-%m-%d %H:%M:%S", tm);
+    printf("\e[0;37m%s.%d\e[0m ", buf, tmnow.tv_usec);
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+}
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
@@ -39,10 +58,9 @@ unsigned int key_map(unsigned int code, bool *bCtrl) {
         case KEY_C:           *bCtrl = true; return KEY_C;
         case KEY_V:           *bCtrl = true; return KEY_V;
 
-        case KEY_A:           return KEY_F15;
-        case KEY_S:           return KEY_F16;
-        case KEY_D:           return KEY_F17;
-        case KEY_F:           return KEY_F18;
+        case KEY_S:           return KEY_F13;
+        case KEY_D:           return KEY_F14;
+        case KEY_F:           return KEY_F15;
 
         case KEY_W:           *bCtrl = true; return KEY_S;
         case KEY_E:           *bCtrl = true; return KEY_TAB;
@@ -147,7 +165,9 @@ static void send_repeat(unsigned int code) {
 
 // input {{{2
 static int read_one_key(struct input_event *ev) {
+    /* write_log("waiting for key\n"); */
     int err = libevdev_next_event(idev, LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING, ev);
+    /* write_log("key: %d\n", ev->code); */
     if (err) {
         fprintf(stderr, "Failed: (%d) %s\n", -err, strerror(err));
         exit(1);
@@ -227,12 +247,12 @@ static void state_decide(void) {    // {{{2
             unsigned int code = key_map(ev.code, &bCtrl);
             /* printf("SPACEcode: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE); */
             if (bCtrl) {
-                send_key(KEY_LEFTCTRL, V_PRESS);
+                send_key(KEY_RIGHTCTRL, V_PRESS);
             }
             send_key(code, V_PRESS);
             send_key(code, V_RELEASE);
             if (bCtrl) {
-                send_key(KEY_LEFTCTRL, V_RELEASE);
+                send_key(KEY_RIGHTCTRL, V_RELEASE);
             }
             state = SHIFT;
             return;
@@ -247,11 +267,11 @@ static void state_decide(void) {    // {{{2
             code = buffer[i];
         }
         if (bCtrl) {
-            send_key(KEY_LEFTCTRL, V_PRESS);
+            send_key(KEY_RIGHTCTRL, V_PRESS);
         }
         send_key(code, V_PRESS);
         if (bCtrl) {
-            send_key(KEY_LEFTCTRL, V_RELEASE);
+            send_key(KEY_RIGHTCTRL, V_RELEASE);
         }
     }
     state = SHIFT;
@@ -281,11 +301,11 @@ static void state_shift(void) {
                 buffer_remove(code);
 
             if (bCtrl && ev.value == V_PRESS) {
-                send_key(KEY_LEFTCTRL, V_PRESS);
+                send_key(KEY_RIGHTCTRL, V_PRESS);
             }
             send_key(code, ev.value);
             if (bCtrl && ev.value == V_RELEASE) {
-                send_key(KEY_LEFTCTRL, V_RELEASE);
+                send_key(KEY_RIGHTCTRL, V_RELEASE);
             }
         } else {
             send_key(ev.code, ev.value);
