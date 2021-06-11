@@ -33,11 +33,23 @@ int write_log(const char *format, ...)
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
+unsigned int  key_map_modifier(unsigned int code) {
+    switch (code) {
+        case KEY_LEFTCTRL:  return KEY_LEFTMETA;
+        case KEY_LEFTALT:   return KEY_LEFTCTRL;
+        case KEY_LEFTMETA:  return KEY_LEFTALT;
+        case KEY_RIGHTALT:  return KEY_RIGHTSHIFT;
+        case KEY_CAPSLOCK:  return KEY_ESC;
+    }
+    return code;
+}
+
 unsigned int key_map(unsigned int code, bool *bCtrl) {
     *bCtrl = false;
     switch (code) {
         case KEY_BRIGHTNESSDOWN:    // my magical escape button
             exit(0);
+
 
         case KEY_H:           return KEY_LEFT;
         case KEY_J:           return KEY_DOWN;
@@ -178,6 +190,9 @@ static int read_one_key(struct input_event *ev) {
         return -1;
     }
 
+    ev->code = key_map_modifier(ev->code);
+    /* write_log("key: %d\n", ev->code); */
+
     if (blacklist(ev->code)) {
         return -1;
     }
@@ -202,6 +217,7 @@ static void state_idle(void) {  // {{{2
             return;
         }
 
+        /* write_log("key: %x\n", ev->code); */
         send_key(ev.code, ev.value);
     }
 }
