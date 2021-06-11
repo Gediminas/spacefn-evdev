@@ -48,7 +48,7 @@ int write_log(const char *format, ...)
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
 unsigned int key_map_modifier(unsigned int code) {
-    printf("code: %d\n", code);
+    //printf("code: %d\n", code);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
         case KEY_LEFTALT:   return KEY_LEFTCTRL;
