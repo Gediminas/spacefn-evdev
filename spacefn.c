@@ -47,87 +47,85 @@ int write_log(const char *format, ...)
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
-unsigned int  key_map_modifier(unsigned int code) {
+unsigned int key_map_modifier(unsigned int code) {
+    printf("code: %d\n", code);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
         case KEY_LEFTALT:   return KEY_LEFTCTRL;
         case KEY_LEFTMETA:  return KEY_LEFTALT;
-        case KEY_RIGHTALT:  return KEY_RIGHTSHIFT;
+        case KEY_RIGHTMETA: return KEY_RIGHTSHIFT; //Apple CMD
+        case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
         case KEY_CAPSLOCK:  return KEY_ESC;
     }
     return code;
 }
 
-unsigned int key_map(int layer, unsigned int code, bool *bShift, bool *bCtrl) {
+unsigned int key_map_spc(unsigned int code, int layer, bool *bShift, bool *bCtrl) {
+    switch (code) {
+        case KEY_BRIGHTNESSDOWN: exit(0);   // my magical escape button
+
+        case KEY_H:           return KEY_LEFT;
+        case KEY_J:           return KEY_DOWN;
+        case KEY_K:           return KEY_UP;
+        case KEY_L:           return KEY_RIGHT;
+
+        case KEY_B:           return KEY_ENTER;
+        case KEY_N:           return KEY_ESC;
+        case KEY_M:           return KEY_BACKSPACE;
+
+        case KEY_Y:           return KEY_SPACE;
+        case KEY_U:           *bCtrl = true; return KEY_LEFT;
+        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
+        case KEY_O:           return KEY_HOME;
+        case KEY_P:           return KEY_END;
+
+        case KEY_X:           *bCtrl = true; return KEY_X;
+        case KEY_C:           *bCtrl = true; return KEY_C;
+        case KEY_V:           *bCtrl = true; return KEY_V;
+
+        case KEY_S:           return KEY_F13;
+        case KEY_D:           return KEY_F14;
+        case KEY_F:           return KEY_F15;
+
+        case KEY_W:           *bCtrl = true; return KEY_S;
+        case KEY_E:           *bCtrl = true; return KEY_TAB;
+        case KEY_T:           return KEY_PAGEUP;
+        case KEY_G:           return KEY_PAGEDOWN;
+
+        case KEY_1:           return KEY_F1;
+        case KEY_2:           return KEY_F2;
+        case KEY_3:           return KEY_F3;
+        case KEY_4:           return KEY_F4;
+        case KEY_5:           return KEY_F5;
+        case KEY_6:           return KEY_F6;
+        case KEY_7:           return KEY_F7;
+        case KEY_8:           return KEY_F8;
+        case KEY_9:           return KEY_F9;
+        case KEY_0:           return KEY_F10;
+        case KEY_MINUS:       return KEY_F11;
+        case KEY_EQUAL:       return KEY_F12;
+    }
+    return 0;
+}
+
+unsigned int key_map_dot(unsigned int code, int layer, bool *bShift, bool *bCtrl) {
+    switch (code) {
+        case KEY_E:           return KEY_LEFTBRACE;
+        case KEY_R:           return KEY_RIGHTBRACE;
+        case KEY_D:           *bShift = true; return KEY_9;
+        case KEY_F:           *bShift = true; return KEY_0;
+        case KEY_X:           *bShift = true; return KEY_LEFTBRACE;
+        case KEY_C:           *bShift = true; return KEY_RIGHTBRACE;
+    }
+    return 0;
+}
+
+unsigned int key_map(unsigned int code, int layer, bool *bShift, bool *bCtrl) {
     *bShift = false;
     *bCtrl = false;
-    printf("LAYER: %d\n", layer);
     switch (layer) {
-        case LAYER_SPC: {
-            switch (code) {
-                case KEY_BRIGHTNESSDOWN:    // my magical escape button
-                    exit(0);
-
-
-                case KEY_H:           return KEY_LEFT;
-                case KEY_J:           return KEY_DOWN;
-                case KEY_K:           return KEY_UP;
-                case KEY_L:           return KEY_RIGHT;
-
-                case KEY_B:           return KEY_ENTER;
-                case KEY_N:           return KEY_ESC;
-                case KEY_M:           return KEY_BACKSPACE;
-
-                case KEY_Y:           return KEY_SPACE;
-                case KEY_U:           *bCtrl = true; return KEY_LEFT;
-                case KEY_I:           *bCtrl = true; return KEY_RIGHT;
-                case KEY_O:           return KEY_HOME;
-                case KEY_P:           return KEY_END;
-
-                case KEY_X:           *bCtrl = true; return KEY_X;
-                case KEY_C:           *bCtrl = true; return KEY_C;
-                case KEY_V:           *bCtrl = true; return KEY_V;
-
-                case KEY_S:           return KEY_F13;
-                case KEY_D:           return KEY_F14;
-                case KEY_F:           return KEY_F15;
-
-                case KEY_W:           *bCtrl = true; return KEY_S;
-                case KEY_E:           *bCtrl = true; return KEY_TAB;
-                case KEY_T:           return KEY_PAGEUP;
-                case KEY_G:           return KEY_PAGEDOWN;
-
-                case KEY_1:           return KEY_F1;
-                case KEY_2:           return KEY_F2;
-                case KEY_3:           return KEY_F3;
-                case KEY_4:           return KEY_F4;
-                case KEY_5:           return KEY_F5;
-                case KEY_6:           return KEY_F6;
-                case KEY_7:           return KEY_F7;
-                case KEY_8:           return KEY_F8;
-                case KEY_9:           return KEY_F9;
-                case KEY_0:           return KEY_F10;
-                case KEY_MINUS:       return KEY_F11;
-                case KEY_EQUAL:       return KEY_F12;
-
-                    //case KEY_SEMICOLON:
-                    //case KEY_COMMA:       return KEY_PAGEDOWN;
-                    //case KEY_DOT:         return KEY_PAGEUP;
-                    //case KEY_SLASH:       return KEY_END;
-            }
-        }
-        break;
-        case LAYER_DOT: {
-            switch (code) {
-                case KEY_E:           return KEY_LEFTBRACE;
-                case KEY_R:           return KEY_RIGHTBRACE;
-                case KEY_D:           *bShift = true; return KEY_9;
-                case KEY_F:           *bShift = true; return KEY_0;
-                case KEY_X:           *bShift = true; return KEY_LEFTBRACE;
-                case KEY_C:           *bShift = true; return KEY_RIGHTBRACE;
-            }
-        }
-        break;
+        case LAYER_SPC: return key_map_spc(code, layer, bShift, bCtrl);
+        case LAYER_DOT: return key_map_dot(code, layer, bShift, bCtrl);
     }
     return 0;
 }
@@ -302,8 +300,8 @@ static void state_decide(void) {    // {{{2
         if (ev.value == V_RELEASE && buffer_remove(ev.code)) {
             bool bShift = false;
             bool bCtrl = false;
-            unsigned int code = key_map(layer, ev.code, &bShift, &bCtrl);
-            printf("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
+            unsigned int code = key_map(ev.code, layer, &bShift, &bCtrl);
+            //printf("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
             if (bShift) {
                 send_key(KEY_RIGHTSHIFT, V_PRESS);
             }
@@ -327,8 +325,8 @@ static void state_decide(void) {    // {{{2
     for (int i=0; i<n_buffer; i++) {
         bool bShift = false;
         bool bCtrl = false;
-        unsigned int code = key_map(layer, buffer[i], &bShift, &bCtrl);
-        printf("SPACEcode2: %d - ctrl %d\n", code, bCtrl);
+        unsigned int code = key_map(buffer[i], layer, &bShift, &bCtrl);
+        //printf("SPACEcode2: %d - ctrl %d\n", code, bCtrl);
         if (!code) {
             code = buffer[i];
         }
@@ -375,8 +373,8 @@ static void state_shift(void) {
 
         bool bShift = false;
         bool bCtrl = false;
-        unsigned int code = key_map(layer, ev.code, &bShift, &bCtrl);
-        printf("SPACEcode3: %d - ctrl %d\n", code, bCtrl);
+        unsigned int code = key_map(ev.code, layer, &bShift, &bCtrl);
+        //printf("SPACEcode3: %d - ctrl %d\n", code, bCtrl);
         if (code) {
             if (ev.value == V_PRESS)
                 buffer_append(code);
