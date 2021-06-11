@@ -15,6 +15,20 @@
 #include <time.h>
 #include <sys/time.h>
 
+// State functions {{{1
+enum {
+    IDLE,
+    DECIDE,
+    SHIFT,
+} state = IDLE;
+
+enum {
+    LAYER_STD,
+    LAYER_SPC,
+    LAYER_DOT,
+} layer = LAYER_STD;
+
+
 int write_log(const char *format, ...)
 {
     struct timeval tmnow;
@@ -44,59 +58,76 @@ unsigned int  key_map_modifier(unsigned int code) {
     return code;
 }
 
-unsigned int key_map(unsigned int code, bool *bCtrl) {
+unsigned int key_map(int layer, unsigned int code, bool *bShift, bool *bCtrl) {
+    *bShift = false;
     *bCtrl = false;
-    switch (code) {
-        case KEY_BRIGHTNESSDOWN:    // my magical escape button
-            exit(0);
+    printf("LAYER: %d\n", layer);
+    switch (layer) {
+        case LAYER_SPC: {
+            switch (code) {
+                case KEY_BRIGHTNESSDOWN:    // my magical escape button
+                    exit(0);
 
 
-        case KEY_H:           return KEY_LEFT;
-        case KEY_J:           return KEY_DOWN;
-        case KEY_K:           return KEY_UP;
-        case KEY_L:           return KEY_RIGHT;
+                case KEY_H:           return KEY_LEFT;
+                case KEY_J:           return KEY_DOWN;
+                case KEY_K:           return KEY_UP;
+                case KEY_L:           return KEY_RIGHT;
 
-        case KEY_B:           return KEY_ENTER;
-        case KEY_N:           return KEY_ESC;
-        case KEY_M:           return KEY_BACKSPACE;
+                case KEY_B:           return KEY_ENTER;
+                case KEY_N:           return KEY_ESC;
+                case KEY_M:           return KEY_BACKSPACE;
 
-        case KEY_Y:           return KEY_SPACE;
-        case KEY_U:           *bCtrl = true; return KEY_LEFT;
-        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
-        case KEY_O:           return KEY_HOME;
-        case KEY_P:           return KEY_END;
+                case KEY_Y:           return KEY_SPACE;
+                case KEY_U:           *bCtrl = true; return KEY_LEFT;
+                case KEY_I:           *bCtrl = true; return KEY_RIGHT;
+                case KEY_O:           return KEY_HOME;
+                case KEY_P:           return KEY_END;
 
-        case KEY_X:           *bCtrl = true; return KEY_X;
-        case KEY_C:           *bCtrl = true; return KEY_C;
-        case KEY_V:           *bCtrl = true; return KEY_V;
+                case KEY_X:           *bCtrl = true; return KEY_X;
+                case KEY_C:           *bCtrl = true; return KEY_C;
+                case KEY_V:           *bCtrl = true; return KEY_V;
 
-        case KEY_S:           return KEY_F13;
-        case KEY_D:           return KEY_F14;
-        case KEY_F:           return KEY_F15;
+                case KEY_S:           return KEY_F13;
+                case KEY_D:           return KEY_F14;
+                case KEY_F:           return KEY_F15;
 
-        case KEY_W:           *bCtrl = true; return KEY_S;
-        case KEY_E:           *bCtrl = true; return KEY_TAB;
-        case KEY_T:           return KEY_PAGEUP;
-        case KEY_G:           return KEY_PAGEDOWN;
+                case KEY_W:           *bCtrl = true; return KEY_S;
+                case KEY_E:           *bCtrl = true; return KEY_TAB;
+                case KEY_T:           return KEY_PAGEUP;
+                case KEY_G:           return KEY_PAGEDOWN;
 
-        case KEY_1:           return KEY_F1;
-        case KEY_2:           return KEY_F2;
-        case KEY_3:           return KEY_F3;
-        case KEY_4:           return KEY_F4;
-        case KEY_5:           return KEY_F5;
-        case KEY_6:           return KEY_F6;
-        case KEY_7:           return KEY_F7;
-        case KEY_8:           return KEY_F8;
-        case KEY_9:           return KEY_F9;
-        case KEY_0:           return KEY_F10;
-        case KEY_MINUS:       return KEY_F11;
-        case KEY_EQUAL:       return KEY_F12;
+                case KEY_1:           return KEY_F1;
+                case KEY_2:           return KEY_F2;
+                case KEY_3:           return KEY_F3;
+                case KEY_4:           return KEY_F4;
+                case KEY_5:           return KEY_F5;
+                case KEY_6:           return KEY_F6;
+                case KEY_7:           return KEY_F7;
+                case KEY_8:           return KEY_F8;
+                case KEY_9:           return KEY_F9;
+                case KEY_0:           return KEY_F10;
+                case KEY_MINUS:       return KEY_F11;
+                case KEY_EQUAL:       return KEY_F12;
 
-        //case KEY_SEMICOLON:
-        //case KEY_COMMA:       return KEY_PAGEDOWN;
-        //case KEY_DOT:         return KEY_PAGEUP;
-        //case KEY_SLASH:       return KEY_END;
-
+                    //case KEY_SEMICOLON:
+                    //case KEY_COMMA:       return KEY_PAGEDOWN;
+                    //case KEY_DOT:         return KEY_PAGEUP;
+                    //case KEY_SLASH:       return KEY_END;
+            }
+        }
+        break;
+        case LAYER_DOT: {
+            switch (code) {
+                case KEY_E:           return KEY_LEFTBRACE;
+                case KEY_R:           return KEY_RIGHTBRACE;
+                case KEY_D:           *bShift = true; return KEY_9;
+                case KEY_F:           *bShift = true; return KEY_0;
+                case KEY_X:           *bShift = true; return KEY_LEFTBRACE;
+                case KEY_C:           *bShift = true; return KEY_RIGHTBRACE;
+            }
+        }
+        break;
     }
     return 0;
 }
@@ -158,6 +189,7 @@ static int buffer_append(unsigned int code) {
 #define V_RELEASE 0
 #define V_PRESS 1
 #define V_REPEAT 2
+
 static void send_key(unsigned int code, int value) {
     libevdev_uinput_write_event(odev, EV_KEY, code, value);
     libevdev_uinput_write_event(odev, EV_SYN, SYN_REPORT, 0);
@@ -200,13 +232,6 @@ static int read_one_key(struct input_event *ev) {
     return 0;
 }
 
-// State functions {{{1
-enum {
-    IDLE,
-    DECIDE,
-    SHIFT,
-} state = IDLE;
-
 static void state_idle(void) {  // {{{2
     struct input_event ev;
     for (;;) {
@@ -214,6 +239,13 @@ static void state_idle(void) {  // {{{2
 
         if (ev.code == KEY_SPACE && ev.value == V_PRESS) {
             state = DECIDE;
+            layer = LAYER_SPC;
+            return;
+        }
+
+        if (ev.code == KEY_DOT && ev.value == V_PRESS) {
+            state = DECIDE;
+            layer = LAYER_DOT;
             return;
         }
 
@@ -253,15 +285,28 @@ static void state_decide(void) {    // {{{2
             return;
         }
 
+        if (ev.code == KEY_DOT && ev.value == V_RELEASE) {
+            send_key(KEY_DOT, V_PRESS);
+            send_key(KEY_DOT, V_RELEASE);
+            for (int i=0; i<n_buffer; i++)
+                send_key(buffer[i], V_PRESS);
+            state = IDLE;
+            return;
+        }
+
         if (ev.value == V_RELEASE && !buffer_contains(ev.code)) {
             send_key(ev.code, ev.value);
             continue;
         }
 
         if (ev.value == V_RELEASE && buffer_remove(ev.code)) {
+            bool bShift = false;
             bool bCtrl = false;
-            unsigned int code = key_map(ev.code, &bCtrl);
-            /* printf("SPACEcode: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE); */
+            unsigned int code = key_map(layer, ev.code, &bShift, &bCtrl);
+            printf("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
+            if (bShift) {
+                send_key(KEY_RIGHTSHIFT, V_PRESS);
+            }
             if (bCtrl) {
                 send_key(KEY_RIGHTCTRL, V_PRESS);
             }
@@ -270,6 +315,9 @@ static void state_decide(void) {    // {{{2
             if (bCtrl) {
                 send_key(KEY_RIGHTCTRL, V_RELEASE);
             }
+            if (bShift) {
+                send_key(KEY_RIGHTSHIFT, V_RELEASE);
+            }
             state = SHIFT;
             return;
         }
@@ -277,10 +325,15 @@ static void state_decide(void) {    // {{{2
 
     printf("timed out\n");
     for (int i=0; i<n_buffer; i++) {
+        bool bShift = false;
         bool bCtrl = false;
-        unsigned int code = key_map(buffer[i], &bCtrl);
+        unsigned int code = key_map(layer, buffer[i], &bShift, &bCtrl);
+        printf("SPACEcode2: %d - ctrl %d\n", code, bCtrl);
         if (!code) {
             code = buffer[i];
+        }
+        if (bShift) {
+            send_key(KEY_RIGHTSHIFT, V_PRESS);
         }
         if (bCtrl) {
             send_key(KEY_RIGHTCTRL, V_PRESS);
@@ -288,6 +341,9 @@ static void state_decide(void) {    // {{{2
         send_key(code, V_PRESS);
         if (bCtrl) {
             send_key(KEY_RIGHTCTRL, V_RELEASE);
+        }
+        if (bShift) {
+            send_key(KEY_RIGHTSHIFT, V_RELEASE);
         }
     }
     state = SHIFT;
@@ -308,20 +364,39 @@ static void state_shift(void) {
         if (ev.code == KEY_SPACE)
             continue;
 
+        if (ev.code == KEY_DOT && ev.value == V_RELEASE) {
+            for (int i=0; i<n_buffer; i++)
+                send_key(buffer[i], V_RELEASE);
+            state = IDLE;
+            return;
+        }
+        if (ev.code == KEY_DOT)
+            continue;
+
+        bool bShift = false;
         bool bCtrl = false;
-        unsigned int code = key_map(ev.code, &bCtrl);
+        unsigned int code = key_map(layer, ev.code, &bShift, &bCtrl);
+        printf("SPACEcode3: %d - ctrl %d\n", code, bCtrl);
         if (code) {
             if (ev.value == V_PRESS)
                 buffer_append(code);
             else if (ev.value == V_RELEASE)
                 buffer_remove(code);
 
+            if (bShift && ev.value == V_PRESS) {
+                send_key(KEY_RIGHTSHIFT, V_PRESS);
+            }
             if (bCtrl && ev.value == V_PRESS) {
                 send_key(KEY_RIGHTCTRL, V_PRESS);
             }
+
             send_key(code, ev.value);
+
             if (bCtrl && ev.value == V_RELEASE) {
                 send_key(KEY_RIGHTCTRL, V_RELEASE);
+            }
+            if (bShift && ev.value == V_RELEASE) {
+                send_key(KEY_RIGHTSHIFT, V_RELEASE);
             }
         } else {
             send_key(ev.code, ev.value);
