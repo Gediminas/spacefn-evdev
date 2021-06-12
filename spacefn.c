@@ -83,7 +83,8 @@ unsigned int key_map_spc(unsigned int code, int vendor, int layer, bool *bShift,
         case KEY_T:           return KEY_PAGEUP;
         case KEY_G:           return KEY_PAGEDOWN;
 
-        case KEY_S:           return KEY_F13;
+        case KEY_A:           *bShift = true; return KEY_F14;
+        case KEY_S:           *bShift = true; return KEY_F15;
         case KEY_D:           return KEY_F14;
         case KEY_F:           return KEY_F15;
 
