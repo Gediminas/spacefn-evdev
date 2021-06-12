@@ -47,8 +47,9 @@ int write_log(const char *format, ...)
 }
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
-unsigned int key_map_modifier(unsigned int code, bool bApple) {
+unsigned int key_map_modifier(unsigned int code, int vendor) {
     //printf("code: %d\n", code);
+    const bool bApple = (vendor == 1452);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
         case KEY_LEFTALT:   return bApple ? KEY_LEFTALT  : KEY_LEFTCTRL;
@@ -60,7 +61,7 @@ unsigned int key_map_modifier(unsigned int code, bool bApple) {
     return code;
 }
 
-unsigned int key_map_spc(unsigned int code, int layer, bool *bShift, bool *bCtrl) {
+unsigned int key_map_spc(unsigned int code, int vendor, int layer, bool *bShift, bool *bCtrl) {
     switch (code) {
         case KEY_BRIGHTNESSDOWN: exit(0);   // my magical escape button
 
@@ -106,7 +107,7 @@ unsigned int key_map_spc(unsigned int code, int layer, bool *bShift, bool *bCtrl
     return 0;
 }
 
-unsigned int key_map_dot(unsigned int code, int layer, bool *bShift, bool *bCtrl) {
+unsigned int key_map_dot(unsigned int code, int vendor, int layer, bool *bShift, bool *bCtrl) {
     switch (code) {
         case KEY_E:           return KEY_LEFTBRACE;
         case KEY_R:           return KEY_RIGHTBRACE;
@@ -133,12 +134,12 @@ unsigned int key_map_dot(unsigned int code, int layer, bool *bShift, bool *bCtrl
     return 0;
 }
 
-unsigned int key_map(unsigned int code, int layer, bool *bShift, bool *bCtrl) {
+unsigned int key_map(unsigned int code, int layer, int vendor, bool *bShift, bool *bCtrl) {
     *bShift = false;
     *bCtrl = false;
     switch (layer) {
-        case LAYER_SPC: return key_map_spc(code, layer, bShift, bCtrl);
-        case LAYER_DOT: return key_map_dot(code, layer, bShift, bCtrl);
+        case LAYER_SPC: return key_map_spc(code, vendor, layer, bShift, bCtrl);
+        case LAYER_DOT: return key_map_dot(code, vendor, layer, bShift, bCtrl);
     }
     return 0;
 }
@@ -214,7 +215,7 @@ static void send_repeat(unsigned int code) {
 }
 
 // input {{{2
-static int read_one_key(struct input_event *ev, bool bApple) {
+static int read_one_key(struct input_event *ev, int vendor) {
     /* write_log("waiting for key\n"); */
     int err = libevdev_next_event(idev, LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING, ev);
     /* write_log("key: %d\n", ev->code); */
@@ -228,7 +229,7 @@ static int read_one_key(struct input_event *ev, bool bApple) {
         return -1;
     }
 
-    ev->code = key_map_modifier(ev->code, bApple);
+    ev->code = key_map_modifier(ev->code, vendor);
     /* write_log("key: %d\n", ev->code); */
 
     if (blacklist(ev->code)) {
@@ -238,10 +239,10 @@ static int read_one_key(struct input_event *ev, bool bApple) {
     return 0;
 }
 
-static void state_idle(bool bApple) {  // {{{2
+static void state_idle(int vendor) {  // {{{2
     struct input_event ev;
     for (;;) {
-        while (read_one_key(&ev, bApple));
+        while (read_one_key(&ev, vendor));
 
         if (ev.code == KEY_SPACE && ev.value == V_PRESS) {
             state = DECIDE;
@@ -260,7 +261,7 @@ static void state_idle(bool bApple) {  // {{{2
     }
 }
 
-static void state_decide(bool bApple, int fd) {    // {{{2
+static void state_decide(int vendor, int fd) {    // {{{2
     n_buffer = 0;
     struct input_event ev;
     struct timeval timeout;
@@ -275,7 +276,7 @@ static void state_decide(bool bApple, int fd) {    // {{{2
         if (!nfds)
             break;
 
-        while (read_one_key(&ev, bApple));
+        while (read_one_key(&ev, vendor));
 
         if (ev.value == V_PRESS) {
             buffer_append(ev.code);
@@ -308,7 +309,7 @@ static void state_decide(bool bApple, int fd) {    // {{{2
         if (ev.value == V_RELEASE && buffer_remove(ev.code)) {
             bool bShift = false;
             bool bCtrl = false;
-            unsigned int code = key_map(ev.code, layer, &bShift, &bCtrl);
+            unsigned int code = key_map(ev.code, layer, vendor, &bShift, &bCtrl);
             //printf("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
             if (bShift) {
                 send_key(KEY_RIGHTSHIFT, V_PRESS);
@@ -333,7 +334,7 @@ static void state_decide(bool bApple, int fd) {    // {{{2
     for (int i=0; i<n_buffer; i++) {
         bool bShift = false;
         bool bCtrl = false;
-        unsigned int code = key_map(buffer[i], layer, &bShift, &bCtrl);
+        unsigned int code = key_map(buffer[i], layer, vendor, &bShift, &bCtrl);
         //printf("SPACEcode2: %d - ctrl %d\n", code, bCtrl);
         if (!code) {
             code = buffer[i];
@@ -355,11 +356,11 @@ static void state_decide(bool bApple, int fd) {    // {{{2
     state = SHIFT;
 }
 
-static void state_shift(bool bApple) {
+static void state_shift(int vendor) {
     n_buffer = 0;
     struct input_event ev;
     for (;;) {
-        while (read_one_key(&ev, bApple));
+        while (read_one_key(&ev, vendor));
 
         if (ev.code == KEY_SPACE && ev.value == V_RELEASE) {
             for (int i=0; i<n_buffer; i++)
@@ -381,7 +382,7 @@ static void state_shift(bool bApple) {
 
         bool bShift = false;
         bool bCtrl = false;
-        unsigned int code = key_map(ev.code, layer, &bShift, &bCtrl);
+        unsigned int code = key_map(ev.code, layer, vendor, &bShift, &bCtrl);
         //printf("SPACEcode3: %d - ctrl %d\n", code, bCtrl);
         if (code) {
             if (ev.value == V_PRESS)
@@ -411,18 +412,18 @@ static void state_shift(bool bApple) {
     }
 }
 
-static void run_state_machine(int fd, bool bApple) {
+static void run_state_machine(int fd, int vendor) {
     for (;;) {
         printf("state %d\n", state);
         switch (state) {
             case IDLE:
-                state_idle(bApple);
+                state_idle(vendor);
                 break;
             case DECIDE:
-                state_decide(bApple, fd);
+                state_decide(vendor, fd);
                 break;
             case SHIFT:
-                state_shift(bApple);
+                state_shift(vendor);
                 break;
         }
     }
@@ -435,21 +436,23 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    const char* sInterface = argv[1];
-    printf("\e[1;33mInterface: %s\e[0m\n", sInterface);
+    const char* interface = argv[1];
+    /* printf("\e[1;33m* Interface: %s\e[0m\n", interface); */
 
-    const int fd = open(sInterface, O_RDONLY);
+    const int fd = open(interface, O_RDONLY);
     if (fd < 0) {
         perror("open input");
         return 1;
     }
-    const bool bApple = strstr(sInterface, "Apple") != NULL;
-
     int err = libevdev_new_from_fd(fd, &idev);
     if (err) {
         fprintf(stderr, "Failed: (%d) %s\n", -err, strerror(err));
         return 1;
     }
+
+    const char* name = libevdev_get_name(idev);
+    const int vendor = libevdev_get_id_vendor(idev);
+    printf("\n\e[0;33m** %s => vendor %d => %s\e[0m\n", interface, vendor, name);
 
     int uifd = open("/dev/uinput", O_RDWR);
     if (uifd < 0) {
@@ -469,5 +472,5 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    run_state_machine(fd, bApple);
+    run_state_machine(fd, vendor);
 }
