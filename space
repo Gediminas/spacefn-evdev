@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 
-killall spacefn_forever > /dev/null 2>&1
-killall spacefn > /dev/null 2>&1
+while true; do
+    killall spacefn > /dev/null 2>&1
 
-KEYBOARDS=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o "event\w*")
+    ALL_KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o "event\w*")
+    echo "ALL"
+    for event in $ALL_KEYB; do
+        echo $event
+        ./spacefn /dev/input/$event &
+    done
 
-for event in $KEYBOARDS; do
-    echo $event
-    ./spacefn /dev/input/$event &
+    ACT_KEYB=$(ps aux | grep "spacefn /dev/input" | grep -o "event\w*")
+    echo -e "\nActive:"
+    for event in $ACT_KEYB; do
+        echo "* $event"
+    done
+
+    # Catch compile
+    # inotifywait "./spacefn" -e ATTRIB #-e CLOSE
+
+    inotifywait "/dev/input" -e CREATE -e DELETE
+    sleep 1
 done
-
-# ./spacefn_forever /dev/input/by-id/usb-Apple_Inc._Magic_Keyboard_FNP7416007CJ20Q1J-if01-event-kbd &
-# ./spacefn_forever /dev/input/by-path/platform-i8042-serio-0-event-kbd &
