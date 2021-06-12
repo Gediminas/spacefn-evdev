@@ -8,7 +8,7 @@ trap ctrl_c INT
 ctrl_c() {
     echo -e "\nspacefn_forever: Trapped CTRL-C"
     # killall spacefn > /dev/null 2>&1
-    kill -SIGTERM $PID
+    kill -SIGTERM $PID > /dev/null 2>&1
     exit
 }
 
@@ -21,10 +21,10 @@ while true; do
   echo "PID: $PID"
 
   # echo "Wathing: $DIRNAME/spacefn"
-  inotifywait "$DIRNAME/spacefn" -e attrib
+  inotifywait "$DIRNAME/spacefn" #-e ATTRIB -e CLOSE
 
   # echo "Killing $PID"
   # killall spacefn > /dev/null 2>&1
-  kill -SIGTERM $PID
-  sleep 1
+  kill -SIGTERM $PID > /dev/null 2>&1
+  sleep 10
 done
