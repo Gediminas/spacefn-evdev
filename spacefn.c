@@ -31,9 +31,6 @@ enum {
 // Global device handles {{{1
 struct libevdev *idev;
 struct libevdev_uinput *odev;
-int fd;
-bool bApple = false;
-
 
 int write_log(const char *format, ...)
 {
@@ -53,7 +50,7 @@ int write_log(const char *format, ...)
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 // Key mapping {{{1
-unsigned int key_map_modifier(unsigned int code) {
+unsigned int key_map_modifier(unsigned int code, bool bApple) {
     //printf("code: %d\n", code);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
@@ -207,7 +204,7 @@ static void send_repeat(unsigned int code) {
 }
 
 // input {{{2
-static int read_one_key(struct input_event *ev) {
+static int read_one_key(struct input_event *ev, bool bApple) {
     /* write_log("waiting for key\n"); */
     int err = libevdev_next_event(idev, LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING, ev);
     /* write_log("key: %d\n", ev->code); */
@@ -221,7 +218,7 @@ static int read_one_key(struct input_event *ev) {
         return -1;
     }
 
-    ev->code = key_map_modifier(ev->code);
+    ev->code = key_map_modifier(ev->code, bApple);
     /* write_log("key: %d\n", ev->code); */
 
     if (blacklist(ev->code)) {
@@ -231,10 +228,10 @@ static int read_one_key(struct input_event *ev) {
     return 0;
 }
 
-static void state_idle(void) {  // {{{2
+static void state_idle(bool bApple) {  // {{{2
     struct input_event ev;
     for (;;) {
-        while (read_one_key(&ev));
+        while (read_one_key(&ev, bApple));
 
         if (ev.code == KEY_SPACE && ev.value == V_PRESS) {
             state = DECIDE;
@@ -253,7 +250,7 @@ static void state_idle(void) {  // {{{2
     }
 }
 
-static void state_decide(void) {    // {{{2
+static void state_decide(bool bApple, int fd) {    // {{{2
     n_buffer = 0;
     struct input_event ev;
     struct timeval timeout;
@@ -268,7 +265,7 @@ static void state_decide(void) {    // {{{2
         if (!nfds)
             break;
 
-        while (read_one_key(&ev));
+        while (read_one_key(&ev, bApple));
 
         if (ev.value == V_PRESS) {
             buffer_append(ev.code);
@@ -348,11 +345,11 @@ static void state_decide(void) {    // {{{2
     state = SHIFT;
 }
 
-static void state_shift(void) {
+static void state_shift(bool bApple) {
     n_buffer = 0;
     struct input_event ev;
     for (;;) {
-        while (read_one_key(&ev));
+        while (read_one_key(&ev, bApple));
 
         if (ev.code == KEY_SPACE && ev.value == V_RELEASE) {
             for (int i=0; i<n_buffer; i++)
@@ -404,18 +401,18 @@ static void state_shift(void) {
     }
 }
 
-static void run_state_machine(void) {
+static void run_state_machine(int fd, bool bApple) {
     for (;;) {
         printf("state %d\n", state);
         switch (state) {
             case IDLE:
-                state_idle();
+                state_idle(bApple);
                 break;
             case DECIDE:
-                state_decide();
+                state_decide(bApple, fd);
                 break;
             case SHIFT:
-                state_shift();
+                state_shift(bApple);
                 break;
         }
     }
@@ -428,13 +425,15 @@ int main(int argc, char **argv) {   // {{{1
         return 1;
     }
 
-    fd = open(argv[1], O_RDONLY);
+    const char* sInterface = argv[1];
+    printf("Interface: %s\n", sInterface);
+
+    const int fd = open(sInterface, O_RDONLY);
     if (fd < 0) {
         perror("open input");
         return 1;
     }
-
-    bApple = (argc > 1) ? argv[2] : false;
+    const bool bApple = strstr(sInterface, "Apple") != NULL;
 
     int err = libevdev_new_from_fd(fd, &idev);
     if (err) {
@@ -460,5 +459,5 @@ int main(int argc, char **argv) {   // {{{1
         return 1;
     }
 
-    run_state_machine();
+    run_state_machine(fd, bApple);
 }
