@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+killall spacefn_forever
+killall spacefn
+
+./spacefn_forever /dev/input/by-id/usb-Apple_Inc._Magic_Keyboard_FNP7416007CJ20Q1J-if01-event-kbd &
+./spacefn_forever /dev/input/by-path/platform-i8042-serio-0-event-kbd &

@@ -13,15 +13,15 @@ ctrl_c() {
 }
 
 while true; do
-  echo "==============================="
-  echo "(RE)STARTED"
+  echo -e "\e[1;33m======================================================\e[0m"
+  echo -e "START"
 
   ("$DIRNAME/spacefn" "$@")&
   PID=$!
   echo "PID: $PID"
 
   # echo "Wathing: $DIRNAME/spacefn"
-  inotifywait "$DIRNAME/spacefn"
+  inotifywait "$DIRNAME/spacefn" -e attrib
 
   # echo "Killing $PID"
   # killall spacefn > /dev/null 2>&1

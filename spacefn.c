@@ -15,7 +15,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-// State functions {{{1
 enum {
     IDLE,
     DECIDE,
@@ -28,7 +27,6 @@ enum {
     LAYER_DOT,
 } layer = LAYER_STD;
 
-// Global device handles {{{1
 struct libevdev *idev;
 struct libevdev_uinput *odev;
 
@@ -49,7 +47,6 @@ int write_log(const char *format, ...)
 }
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
-// Key mapping {{{1
 unsigned int key_map_modifier(unsigned int code, bool bApple) {
     //printf("code: %d\n", code);
     switch (code) {
@@ -67,34 +64,6 @@ unsigned int key_map_spc(unsigned int code, int layer, bool *bShift, bool *bCtrl
     switch (code) {
         case KEY_BRIGHTNESSDOWN: exit(0);   // my magical escape button
 
-        case KEY_H:           return KEY_LEFT;
-        case KEY_J:           return KEY_DOWN;
-        case KEY_K:           return KEY_UP;
-        case KEY_L:           return KEY_RIGHT;
-
-        case KEY_B:           return KEY_ENTER;
-        case KEY_N:           return KEY_ESC;
-        case KEY_M:           return KEY_BACKSPACE;
-
-        case KEY_Y:           return KEY_SPACE;
-        case KEY_U:           *bCtrl = true; return KEY_LEFT;
-        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
-        case KEY_O:           return KEY_HOME;
-        case KEY_P:           return KEY_END;
-
-        case KEY_X:           *bCtrl = true; return KEY_X;
-        case KEY_C:           *bCtrl = true; return KEY_C;
-        case KEY_V:           *bCtrl = true; return KEY_V;
-
-        case KEY_S:           return KEY_F13;
-        case KEY_D:           return KEY_F14;
-        case KEY_F:           return KEY_F15;
-
-        case KEY_W:           *bCtrl = true; return KEY_S;
-        case KEY_E:           *bCtrl = true; return KEY_TAB;
-        case KEY_T:           return KEY_PAGEUP;
-        case KEY_G:           return KEY_PAGEDOWN;
-
         case KEY_1:           return KEY_F1;
         case KEY_2:           return KEY_F2;
         case KEY_3:           return KEY_F3;
@@ -107,6 +76,32 @@ unsigned int key_map_spc(unsigned int code, int layer, bool *bShift, bool *bCtrl
         case KEY_0:           return KEY_F10;
         case KEY_MINUS:       return KEY_F11;
         case KEY_EQUAL:       return KEY_F12;
+
+        case KEY_W:           *bCtrl = true; return KEY_S;
+        case KEY_E:           *bCtrl = true; return KEY_TAB;
+        case KEY_T:           return KEY_PAGEUP;
+        case KEY_G:           return KEY_PAGEDOWN;
+
+        case KEY_S:           return KEY_F13;
+        case KEY_D:           return KEY_F14;
+        case KEY_F:           return KEY_F15;
+
+        case KEY_X:           *bCtrl = true; return KEY_X;
+        case KEY_C:           *bCtrl = true; return KEY_C;
+        case KEY_V:           *bCtrl = true; return KEY_V;
+
+        case KEY_H:           return KEY_LEFT;
+        case KEY_J:           return KEY_DOWN;
+        case KEY_K:           return KEY_UP;
+        case KEY_L:           return KEY_RIGHT;
+        case KEY_B:           return KEY_ENTER;
+        case KEY_N:           return KEY_ESC;
+        case KEY_M:           return KEY_BACKSPACE;
+        case KEY_Y:           return KEY_SPACE;
+        case KEY_U:           *bCtrl = true; return KEY_LEFT;
+        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
+        case KEY_O:           return KEY_HOME;
+        case KEY_P:           return KEY_END;
     }
     return 0;
 }
@@ -115,10 +110,25 @@ unsigned int key_map_dot(unsigned int code, int layer, bool *bShift, bool *bCtrl
     switch (code) {
         case KEY_E:           return KEY_LEFTBRACE;
         case KEY_R:           return KEY_RIGHTBRACE;
+
         case KEY_D:           *bShift = true; return KEY_9;
         case KEY_F:           *bShift = true; return KEY_0;
+
         case KEY_X:           *bShift = true; return KEY_LEFTBRACE;
         case KEY_C:           *bShift = true; return KEY_RIGHTBRACE;
+
+        case KEY_H:           return KEY_LEFT;
+        case KEY_J:           return KEY_DOWN;
+        case KEY_K:           return KEY_UP;
+        case KEY_L:           return KEY_RIGHT;
+        case KEY_B:           return KEY_ENTER;
+        case KEY_N:           return KEY_ESC;
+        case KEY_M:           return KEY_BACKSPACE;
+        case KEY_Y:           return KEY_SPACE;
+        case KEY_U:           *bCtrl = true; return KEY_LEFT;
+        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
+        case KEY_O:           return KEY_HOME;
+        case KEY_P:           return KEY_END;
     }
     return 0;
 }
@@ -419,14 +429,14 @@ static void run_state_machine(int fd, bool bApple) {
 }
 
 
-int main(int argc, char **argv) {   // {{{1
+int main(int argc, char **argv) {
     if (argc < 2) {
         printf("usage: %s /dev/input/...", argv[0]);
         return 1;
     }
 
     const char* sInterface = argv[1];
-    printf("Interface: %s\n", sInterface);
+    printf("\e[1;33mInterface: %s\e[0m\n", sInterface);
 
     const int fd = open(sInterface, O_RDONLY);
     if (fd < 0) {
