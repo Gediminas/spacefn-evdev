@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+killall spacefn > /dev/null 2>&1
+killall space > /dev/null 2>&1
