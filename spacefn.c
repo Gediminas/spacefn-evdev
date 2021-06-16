@@ -48,8 +48,7 @@ int write_log(const char *format, ...)
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 unsigned int key_map_modifier(unsigned int code, int vendor) {
-    //printf("code: %d\n", code);
-    const bool bApple = (vendor == 1452);
+    const bool bApple = (vendor == 1452 || vendor == 76);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
         case KEY_LEFTALT:   return bApple ? KEY_LEFTALT  : KEY_LEFTCTRL;
@@ -61,7 +60,7 @@ unsigned int key_map_modifier(unsigned int code, int vendor) {
     return code;
 }
 
-unsigned int key_map_spc(unsigned int code, int vendor, int layer, bool *bShift, bool *bCtrl) {
+unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift) {
     switch (code) {
         case KEY_BRIGHTNESSDOWN: exit(0);   // my magical escape button
 
@@ -83,10 +82,10 @@ unsigned int key_map_spc(unsigned int code, int vendor, int layer, bool *bShift,
         case KEY_T:           return KEY_PAGEUP;
         case KEY_G:           return KEY_PAGEDOWN;
 
-        case KEY_A:           *bShift = true; return KEY_F14;
-        case KEY_S:           *bShift = true; return KEY_F15;
-        case KEY_D:           return KEY_F14;
-        case KEY_F:           return KEY_F15;
+        case KEY_A:           *bAlt = *bShift = true; return KEY_TAB;
+        case KEY_S:           *bAlt = true;           return KEY_TAB;
+        case KEY_D:           *bAlt = *bCtrl = true;  return KEY_LEFT;
+        case KEY_F:           *bAlt = *bCtrl = true;  return KEY_RIGHT;
 
         case KEY_X:           *bCtrl = true; return KEY_X;
         case KEY_C:           *bCtrl = true; return KEY_C;
@@ -108,7 +107,7 @@ unsigned int key_map_spc(unsigned int code, int vendor, int layer, bool *bShift,
     return 0;
 }
 
-unsigned int key_map_dot(unsigned int code, int vendor, int layer, bool *bShift, bool *bCtrl) {
+unsigned int key_map_dot(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift) {
     switch (code) {
         case KEY_E:           return KEY_LEFTBRACE;
         case KEY_R:           return KEY_RIGHTBRACE;
@@ -135,14 +134,17 @@ unsigned int key_map_dot(unsigned int code, int vendor, int layer, bool *bShift,
     return 0;
 }
 
-unsigned int key_map(unsigned int code, int layer, int vendor, bool *bShift, bool *bCtrl) {
-    *bShift = false;
+unsigned int key_map(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift) {
+    unsigned int new_code = 0;
+    *bAlt = false;
     *bCtrl = false;
+    *bShift = false;
     switch (layer) {
-        case LAYER_SPC: return key_map_spc(code, vendor, layer, bShift, bCtrl);
-        case LAYER_DOT: return key_map_dot(code, vendor, layer, bShift, bCtrl);
+        case LAYER_SPC: new_code = key_map_spc(code, layer, vendor, bAlt, bCtrl, bShift); break;
+        case LAYER_DOT: new_code = key_map_dot(code, layer, vendor, bAlt, bCtrl, bShift); break;
     }
-    return 0;
+    //printf("Mapped %d => %d [%c%c%c]\n", code, new_code, *bAlt ? 'A' : '-', *bCtrl ? 'C' : '-', *bShift ? 'S' : '-');
+    return new_code;
 }
 
 // Blacklist keys for which I have a mapping, to try and train myself out of using them
@@ -308,24 +310,19 @@ static void state_decide(int vendor, int fd) {    // {{{2
         }
 
         if (ev.value == V_RELEASE && buffer_remove(ev.code)) {
-            bool bShift = false;
+            bool bAlt = false;
             bool bCtrl = false;
-            unsigned int code = key_map(ev.code, layer, vendor, &bShift, &bCtrl);
+            bool bShift = false;
+            unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift);
             //printf("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
-            if (bShift) {
-                send_key(KEY_RIGHTSHIFT, V_PRESS);
-            }
-            if (bCtrl) {
-                send_key(KEY_RIGHTCTRL, V_PRESS);
-            }
+            if (bAlt)   { send_key(KEY_RIGHTALT,   V_PRESS); }
+            if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_PRESS); }
+            if (bShift) { send_key(KEY_RIGHTSHIFT, V_PRESS); }
             send_key(code, V_PRESS);
             send_key(code, V_RELEASE);
-            if (bCtrl) {
-                send_key(KEY_RIGHTCTRL, V_RELEASE);
-            }
-            if (bShift) {
-                send_key(KEY_RIGHTSHIFT, V_RELEASE);
-            }
+            if (bShift) { send_key(KEY_RIGHTSHIFT, V_RELEASE); }
+            if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_RELEASE); }
+            if (bAlt)   { send_key(KEY_RIGHTALT,   V_RELEASE); }
             state = SHIFT;
             return;
         }
@@ -333,26 +330,21 @@ static void state_decide(int vendor, int fd) {    // {{{2
 
     printf("timed out\n");
     for (int i=0; i<n_buffer; i++) {
-        bool bShift = false;
+        bool bAlt = false;
         bool bCtrl = false;
-        unsigned int code = key_map(buffer[i], layer, vendor, &bShift, &bCtrl);
+        bool bShift = false;
+        unsigned int code = key_map(buffer[i], layer, vendor, &bAlt, &bCtrl, &bShift);
         //printf("SPACEcode2: %d - ctrl %d\n", code, bCtrl);
         if (!code) {
             code = buffer[i];
         }
-        if (bShift) {
-            send_key(KEY_RIGHTSHIFT, V_PRESS);
-        }
-        if (bCtrl) {
-            send_key(KEY_RIGHTCTRL, V_PRESS);
-        }
+        if (bAlt)   { send_key(KEY_RIGHTALT,   V_PRESS); }
+        if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_PRESS); }
+        if (bShift) { send_key(KEY_RIGHTSHIFT, V_PRESS); }
         send_key(code, V_PRESS);
-        if (bCtrl) {
-            send_key(KEY_RIGHTCTRL, V_RELEASE);
-        }
-        if (bShift) {
-            send_key(KEY_RIGHTSHIFT, V_RELEASE);
-        }
+        if (bShift) { send_key(KEY_RIGHTSHIFT, V_RELEASE); }
+        if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_RELEASE); }
+        if (bAlt)   { send_key(KEY_RIGHTALT,   V_RELEASE); }
     }
     state = SHIFT;
 }
@@ -381,30 +373,31 @@ static void state_shift(int vendor) {
         if (ev.code == KEY_DOT)
             continue;
 
-        bool bShift = false;
+        bool bAlt = false;
         bool bCtrl = false;
-        unsigned int code = key_map(ev.code, layer, vendor, &bShift, &bCtrl);
+        bool bShift = false;
+        unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift);
         //printf("SPACEcode3: %d - ctrl %d\n", code, bCtrl);
         if (code) {
-            if (ev.value == V_PRESS)
+            if (ev.value == V_PRESS) {
                 buffer_append(code);
-            else if (ev.value == V_RELEASE)
-                buffer_remove(code);
-
-            if (bShift && ev.value == V_PRESS) {
-                send_key(KEY_RIGHTSHIFT, V_PRESS);
             }
-            if (bCtrl && ev.value == V_PRESS) {
-                send_key(KEY_RIGHTCTRL, V_PRESS);
+            else if (ev.value == V_RELEASE) {
+                buffer_remove(code);
+            }
+
+            if (ev.value == V_PRESS) {
+                if (bAlt)   { send_key(KEY_RIGHTALT,   V_PRESS); }
+                if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_PRESS); }
+                if (bShift) { send_key(KEY_RIGHTSHIFT, V_PRESS); }
             }
 
             send_key(code, ev.value);
 
-            if (bCtrl && ev.value == V_RELEASE) {
-                send_key(KEY_RIGHTCTRL, V_RELEASE);
-            }
-            if (bShift && ev.value == V_RELEASE) {
-                send_key(KEY_RIGHTSHIFT, V_RELEASE);
+            if (ev.value == V_PRESS) {
+                if (bShift) { send_key(KEY_RIGHTSHIFT, V_RELEASE); }
+                if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_RELEASE); }
+                if (bAlt)   { send_key(KEY_RIGHTALT,   V_RELEASE); }
             }
         } else {
             send_key(ev.code, ev.value);

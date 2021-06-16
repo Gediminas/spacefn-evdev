@@ -3,22 +3,36 @@
 while true; do
     killall spacefn > /dev/null 2>&1
 
+    echo "STARTING ALL"
+
     ALL_KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o "event\w*")
-    echo "ALL"
-    for event in $ALL_KEYB; do
-        echo $event
-        ./spacefn /dev/input/$event &
+    for EVENT in $ALL_KEYB; do
+        echo "$EVENT: STARTING"
+        ./spacefn /dev/input/$EVENT &
     done
+    sleep 5
 
-    ACT_KEYB=$(ps aux | grep "spacefn /dev/input" | grep -o "event\w*")
-    echo -e "\nActive:"
-    for event in $ACT_KEYB; do
-        echo "* $event"
+    echo "WATCHING"
+
+    while true; do
+        # Catch compile
+        # inotifywait "./spacefn" -e ATTRIB #-e CLOSE
+        LINE=$(inotifywait "/dev/input" -q -e CREATE -e ATTRIB)
+        EVENT=$(echo $LINE | grep -o "event\w*")
+        KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep $EVENT)
+        if [[ -z $KEYB ]]; then
+            continue
+        fi
+        if [[ "$LINE" == *"ATTRIB"* ]]; then
+            echo "RECOMPILED. RESTARTING ALL"
+            break;
+        fi
+        echo "$LINE"
+        echo "$EVENT: STARTING '$KEYB'"
+        ./spacefn /dev/input/$EVENT &
+        sleep 1
+
+        # # KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o %f)
+        # echo "EVENT: $f => $KEYB"
     done
-
-    # Catch compile
-    # inotifywait "./spacefn" -e ATTRIB #-e CLOSE
-
-    inotifywait "/dev/input" -e CREATE -e DELETE
-    sleep 1
 done
