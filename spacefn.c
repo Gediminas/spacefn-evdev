@@ -49,6 +49,7 @@ int write_log(const char *format, ...)
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 unsigned int key_map_modifier(unsigned int code, int vendor) {
     const bool bApple = (vendor == 1452 || vendor == 76);
+    //printf("%d => ", code);
     switch (code) {
         case KEY_LEFTCTRL:  return KEY_LEFTMETA;
         case KEY_LEFTALT:   return bApple ? KEY_LEFTALT  : KEY_LEFTCTRL;
@@ -56,7 +57,9 @@ unsigned int key_map_modifier(unsigned int code, int vendor) {
         case KEY_RIGHTMETA: return KEY_RIGHTSHIFT; //Apple CMD
         case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
         case KEY_CAPSLOCK:  return KEY_ESC;
+        case KEY_SYSRQ:     return KEY_RIGHTALT;   //ThinkPad PrtSc
     }
+    //printf("%d (%d)\n", code, KEY_SYSRQ);
     return code;
 }
 
@@ -103,6 +106,7 @@ unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, b
         case KEY_I:           *bCtrl = true; return KEY_RIGHT;
         case KEY_O:           return KEY_HOME;
         case KEY_P:           return KEY_END;
+        case KEY_BACKSPACE:   return KEY_DELETE;
     }
     return 0;
 }
@@ -315,14 +319,14 @@ static void state_decide(int vendor, int fd) {    // {{{2
             bool bShift = false;
             unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift);
             //printf("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
-            if (bAlt)   { send_key(KEY_RIGHTALT,   V_PRESS); }
-            if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_PRESS); }
-            if (bShift) { send_key(KEY_RIGHTSHIFT, V_PRESS); }
+            if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
+            if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
+            if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
             send_key(code, V_PRESS);
             send_key(code, V_RELEASE);
-            if (bShift) { send_key(KEY_RIGHTSHIFT, V_RELEASE); }
-            if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_RELEASE); }
-            if (bAlt)   { send_key(KEY_RIGHTALT,   V_RELEASE); }
+            if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
+            if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
+            if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
             state = SHIFT;
             return;
         }
@@ -338,13 +342,13 @@ static void state_decide(int vendor, int fd) {    // {{{2
         if (!code) {
             code = buffer[i];
         }
-        if (bAlt)   { send_key(KEY_RIGHTALT,   V_PRESS); }
-        if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_PRESS); }
-        if (bShift) { send_key(KEY_RIGHTSHIFT, V_PRESS); }
+        if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
+        if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
+        if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
         send_key(code, V_PRESS);
-        if (bShift) { send_key(KEY_RIGHTSHIFT, V_RELEASE); }
-        if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_RELEASE); }
-        if (bAlt)   { send_key(KEY_RIGHTALT,   V_RELEASE); }
+        if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
+        if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
+        if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
     }
     state = SHIFT;
 }
@@ -387,17 +391,17 @@ static void state_shift(int vendor) {
             }
 
             if (ev.value == V_PRESS) {
-                if (bAlt)   { send_key(KEY_RIGHTALT,   V_PRESS); }
-                if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_PRESS); }
-                if (bShift) { send_key(KEY_RIGHTSHIFT, V_PRESS); }
+                if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
+                if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
+                if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
             }
 
             send_key(code, ev.value);
 
             if (ev.value == V_PRESS) {
-                if (bShift) { send_key(KEY_RIGHTSHIFT, V_RELEASE); }
-                if (bCtrl)  { send_key(KEY_RIGHTCTRL,  V_RELEASE); }
-                if (bAlt)   { send_key(KEY_RIGHTALT,   V_RELEASE); }
+                if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
+                if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
+                if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
             }
         } else {
             send_key(ev.code, ev.value);
