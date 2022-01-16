@@ -14,6 +14,8 @@
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/dir.h>
+#include <unistd.h>
 
 enum {
     IDLE,
@@ -215,16 +217,11 @@ static void send_key(unsigned int code, int value) {
     libevdev_uinput_write_event(odev, EV_SYN, SYN_REPORT, 0);
 }
 
-static void send_press(unsigned int code) {
-    send_key(code, 1);
-}
-
-static void send_release(unsigned int code) {
-    send_key(code, 0);
-}
-
-static void send_repeat(unsigned int code) {
-    send_key(code, 2);
+static void print_event(struct input_event *ev) {
+    printf("Event: %s %s %d\n",
+           libevdev_event_type_get_name(ev->type),
+           libevdev_event_code_get_name(ev->type, ev->code),
+           ev->value);
 }
 
 // input {{{2
@@ -251,6 +248,38 @@ static int read_one_key(struct input_event *ev, int vendor) {
 
     return 0;
 }
+
+// Change buffer from decide state raw keys to shift state mapped keys.
+// Just clearing the buffer on decide -> shift change can lead to presses without
+// a release sometimes and that can lock a laptop trackpad.
+static void fix_buffer(int layer, int vendor) {
+    unsigned int tbuffer[MAX_BUFFER];
+    int moves = 0;
+    for (int i=0; i<n_buffer; i++) {
+        bool bAlt = false;
+        bool bCtrl = false;
+        bool bShift = false;
+        bool bSuper = false;
+        unsigned int code = key_map(buffer[i], layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
+        if (!code) {
+            code = buffer[i];
+        } else {
+            tbuffer[moves++] = code;
+        }
+        if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
+        if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
+        if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
+        if (bSuper) { send_key(KEY_LEFTMETA,  V_PRESS); }
+        send_key(code, V_PRESS);
+        if (bSuper) { send_key(KEY_LEFTMETA,  V_RELEASE); }
+        if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
+        if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
+        if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
+    }
+    n_buffer = moves;
+    if (n_buffer > 0) memcpy(buffer, tbuffer, n_buffer * sizeof(*buffer));
+}
+
 
 static void state_idle(int vendor) {  // {{{2
     struct input_event ev;
@@ -299,8 +328,10 @@ static void state_decide(int vendor, int fd) {    // {{{2
         if (ev.code == KEY_SPACE && ev.value == V_RELEASE) {
             send_key(KEY_SPACE, V_PRESS);
             send_key(KEY_SPACE, V_RELEASE);
+            // These weren't mapped, so send the actual presses and clear the buffer.
             for (int i=0; i<n_buffer; i++)
                 send_key(buffer[i], V_PRESS);
+            n_buffer = 0;
             state = IDLE;
             return;
         }
@@ -332,43 +363,30 @@ static void state_decide(int vendor, int fd) {    // {{{2
             if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
             if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
             if (bSuper) { send_key(KEY_LEFTMETA,  V_PRESS); }
-            send_key(code, V_PRESS);
-            send_key(code, V_RELEASE);
+            if (code) {
+                send_key(code, V_PRESS);
+                send_key(code, V_RELEASE);
+            } else {
+                send_key(ev.code, V_PRESS);
+                send_key(ev.code, V_RELEASE);
+            }
             if (bSuper) { send_key(KEY_LEFTMETA,  V_RELEASE); }
             if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
             if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
             if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
             state = SHIFT;
+            fix_buffer(layer, vendor);
             return;
         }
     }
 
     printf("timed out\n");
-    for (int i=0; i<n_buffer; i++) {
-        bool bAlt = false;
-        bool bCtrl = false;
-        bool bShift = false;
-        bool bSuper = false;
-        unsigned int code = key_map(buffer[i], layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
-        write_log("SPACEcode2: %d - ctrl %d\n", code, bCtrl);
-        if (!code) {
-            code = buffer[i];
-        }
-        if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
-        if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
-        if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
-        if (bSuper) { send_key(KEY_LEFTMETA,  V_PRESS); }
-        send_key(code, V_PRESS);
-        if (bSuper) { send_key(KEY_LEFTMETA,  V_RELEASE); }
-        if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
-        if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
-        if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
-    }
+    fix_buffer(layer, vendor);
     state = SHIFT;
 }
 
 static void state_shift(int vendor) {
-    n_buffer = 0;
+    //n_buffer = 0;
     struct input_event ev;
     for (;;) {
         while (read_one_key(&ev, vendor));
@@ -444,6 +462,19 @@ static void run_state_machine(int fd, int vendor) {
     }
 }
 
+static int dev_select(const struct direct *entry) {
+    if (entry->d_type == DT_CHR) return 1;
+    else return 0;
+}
+
+static int is_keeb(struct libevdev *idev) {
+    if (libevdev_has_event_type(idev, EV_KEY) &&
+        libevdev_has_event_type(idev, EV_SYN) &&
+        libevdev_get_phys(idev) &&  // This will exclude virtual keyboards (like another spacefn instance).
+        libevdev_has_event_code(idev, EV_KEY, KEY_SPACE) &&
+        libevdev_has_event_code(idev, EV_KEY, KEY_A)) return 1;
+    else return 0;
+}
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -453,6 +484,15 @@ int main(int argc, char **argv) {
 
     const char* interface = argv[1];
     /* printf("\e[1;33m* Interface: %s\e[0m\n", interface); */
+
+    // This sleep is a hack but it gives X time to read the Enter release event
+    // when starting (unless someone holds it longer then a second) which keeps
+    // several bad things from happening including "stuck" enter and possible locking
+    // of a laptop trackpad until another key is pressed- and maybe longer).
+    // Not sure who to solve this properly, the enter release will come from
+    // spacefn without it and X seems to not connect the press and release in 
+    // this case (different logical keyboards).
+    sleep(1);
 
     const int fd = open(interface, O_RDONLY);
     if (fd < 0) {
@@ -464,6 +504,20 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed: (%d) %s\n", -err, strerror(err));
         return 1;
     }
+
+    //START sstanfield
+    printf("Input device name: \"%s\"\n", libevdev_get_name(idev));
+    printf("Input device ID: bus %#x vendor %#x product %#x\n",
+       libevdev_get_id_bustype(idev),
+       libevdev_get_id_vendor(idev),
+       libevdev_get_id_product(idev));
+    if (!is_keeb(idev)) {
+        fprintf(stderr, "This device does not look like a keyboard\n");
+        return 1;
+    }
+    printf("Location: %s\n", libevdev_get_phys(idev));
+    if (libevdev_get_uniq(idev)) printf("Identity: %s\n", libevdev_get_uniq(idev));
+    //END sstanfield
 
     const char* name = libevdev_get_name(idev);
     const int vendor = libevdev_get_id_vendor(idev);

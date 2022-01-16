@@ -3,7 +3,8 @@
 SPACEFN="${BASH_SOURCE[0]}fn"
 echo SpaceFn: $SPACEFN
 
-while true; do
+# Run as a service
+# while true; do
     killall spacefn > /dev/null 2>&1
 
     echo "STARTING ALL"
@@ -38,4 +39,4 @@ while true; do
         # # KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o %f)
         # echo "EVENT: $f => $KEYB"
     done
-done
+# done
