@@ -32,8 +32,7 @@ enum {
 struct libevdev *idev;
 struct libevdev_uinput *odev;
 
-int write_log(const char *format, ...)
-{
+static int _log(const char *format, ...) {
     struct timeval tmnow;
     struct tm *tm;
     char buf[30], usec_buf[6];
@@ -49,7 +48,7 @@ int write_log(const char *format, ...)
 }
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
-unsigned int key_map_modifier(unsigned int code, int vendor) {
+static unsigned int key_map_modifier(unsigned int code, int vendor) {
     const bool bApple = (vendor == 1452 || vendor == 76);
     //printf("%d => ", code);
     switch (code) {
@@ -65,7 +64,7 @@ unsigned int key_map_modifier(unsigned int code, int vendor) {
     return code;
 }
 
-unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
+static unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
     switch (code) {
         case KEY_BRIGHTNESSDOWN: exit(0);   // some magical escape button?
 
@@ -226,9 +225,7 @@ static void print_event(struct input_event *ev) {
 
 // input {{{2
 static int read_one_key(struct input_event *ev, int vendor) {
-    /* write_log("waiting for key\n"); */
-    int err = libevdev_next_event(idev, LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING, ev);
-    /* write_log("key: %d\n", ev->code); */
+    const int err = libevdev_next_event(idev, LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING, ev);
     if (err) {
         fprintf(stderr, "Failed: (%d) %s\n", -err, strerror(err));
         exit(1);
@@ -240,7 +237,6 @@ static int read_one_key(struct input_event *ev, int vendor) {
     }
 
     ev->code = key_map_modifier(ev->code, vendor);
-    /* write_log("key: %d\n", ev->code); */
 
     if (blacklist(ev->code)) {
         return -1;
@@ -298,7 +294,6 @@ static void state_idle(int vendor) {  // {{{2
             return;
         }
 
-        /* write_log("key: %x\n", ev->code); */
         send_key(ev.code, ev.value);
     }
 }
@@ -356,8 +351,7 @@ static void state_decide(int vendor, int fd) {    // {{{2
             bool bShift = false;
             bool bSuper = false;
 
-            unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
-            write_log("SPACEcode1: %d - ctrl %d,  press %d,  release %d\n", code, bCtrl, V_PRESS, V_RELEASE);
+            const unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
 
             if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
             if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
@@ -380,7 +374,7 @@ static void state_decide(int vendor, int fd) {    // {{{2
         }
     }
 
-    printf("timed out\n");
+    //printf("timed out\n");
     fix_buffer(layer, vendor);
     state = SHIFT;
 }
@@ -447,7 +441,7 @@ static void state_shift(int vendor) {
 
 static void run_state_machine(int fd, int vendor) {
     for (;;) {
-        printf("state %d\n", state);
+        //printf("state %d\n", state);
         switch (state) {
             case IDLE:
                 state_idle(vendor);
@@ -483,7 +477,6 @@ int main(int argc, char **argv) {
     }
 
     const char* interface = argv[1];
-    /* printf("\e[1;33m* Interface: %s\e[0m\n", interface); */
 
     // This sleep is a hack but it gives X time to read the Enter release event
     // when starting (unless someone holds it longer then a second) which keeps
@@ -499,29 +492,29 @@ int main(int argc, char **argv) {
         perror("open input");
         return 1;
     }
+
     int err = libevdev_new_from_fd(fd, &idev);
     if (err) {
         fprintf(stderr, "Failed: (%d) %s\n", -err, strerror(err));
         return 1;
     }
 
-    //START sstanfield
-    printf("Input device name: \"%s\"\n", libevdev_get_name(idev));
-    printf("Input device ID: bus %#x vendor %#x product %#x\n",
-       libevdev_get_id_bustype(idev),
-       libevdev_get_id_vendor(idev),
-       libevdev_get_id_product(idev));
-    if (!is_keeb(idev)) {
+    const char* name    = libevdev_get_name(idev);
+    const int   vendor  = libevdev_get_id_vendor(idev);
+    const int   bustype = libevdev_get_id_bustype(idev);
+    const int   product = libevdev_get_id_product(idev);
+    const int   keeb    = is_keeb(idev);
+    const char* phys    = libevdev_get_phys(idev);
+    const char* uniq    = libevdev_get_uniq(idev);
+    
+    _log("%s: %s, bus: %#x, vendor: %#x, product: %#x, phys: %s)\n", interface, name, bustype, vendor, product, phys);
+
+    if (!keeb) {
         fprintf(stderr, "This device does not look like a keyboard\n");
         return 1;
     }
-    printf("Location: %s\n", libevdev_get_phys(idev));
-    if (libevdev_get_uniq(idev)) printf("Identity: %s\n", libevdev_get_uniq(idev));
-    //END sstanfield
 
-    const char* name = libevdev_get_name(idev);
-    const int vendor = libevdev_get_id_vendor(idev);
-    printf("\n\e[0;33m** %s => vendor %d => %s\e[0m\n", interface, vendor, name);
+
 
     int uifd = open("/dev/uinput", O_RDWR);
     if (uifd < 0) {

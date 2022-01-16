@@ -3,40 +3,30 @@
 SPACEFN="${BASH_SOURCE[0]}fn"
 echo SpaceFn: $SPACEFN
 
-# Run as a service
-# while true; do
-    killall spacefn > /dev/null 2>&1
+echo "CLEANUP"
+killall spacefn > /dev/null 2>&1
 
-    echo "STARTING ALL"
+echo "SCANNING & STARTING"
+ALL_KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o "event\w*")
+for EVENT in $ALL_KEYB; do
+    echo "Starting $EVENT"
+    $SPACEFN /dev/input/$EVENT &
+done
+sleep 5
 
-    ALL_KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o "event\w*")
-    for EVENT in $ALL_KEYB; do
-        echo "$EVENT: STARTING"
-        $SPACEFN /dev/input/$EVENT &
-    done
-    sleep 5
+echo "WATCHING"
+while true; do
+    STDOUT=$(inotifywait "/dev/input" -q -e CREATE)
+    EVENT=$(echo $STDOUT | grep -o "event\w*")
+    KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep $EVENT)
 
-    echo "WATCHING"
+    if [[ -z $KEYB ]]; then
+        continue
+    fi
 
-    while true; do
-        # Catch compile
-        # inotifywait "./spacefn" -e ATTRIB #-e CLOSE
-        LINE=$(inotifywait "/dev/input" -q -e CREATE -e ATTRIB)
-        EVENT=$(echo $LINE | grep -o "event\w*")
-        KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep $EVENT)
-        if [[ -z $KEYB ]]; then
-            continue
-        fi
-        if [[ "$LINE" == *"ATTRIB"* ]]; then
-            echo "RECOMPILED. RESTARTING ALL"
-            break;
-        fi
-        echo "$LINE"
-        echo "$EVENT: STARTING '$KEYB'"
-        $SPACEFN /dev/input/$EVENT &
-        sleep 1
+    echo "$STDOUT"
+    echo "Starting $EVENT"
+    $SPACEFN /dev/input/$EVENT &
+    sleep 1
+done
 
-        # # KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o %f)
-        # echo "EVENT: $f => $KEYB"
-    done
-# done
