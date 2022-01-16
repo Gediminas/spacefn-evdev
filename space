@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+SPACEFN="${BASH_SOURCE[0]}fn"
+echo SpaceFn: $SPACEFN
+
 while true; do
     killall spacefn > /dev/null 2>&1
 
@@ -8,7 +11,7 @@ while true; do
     ALL_KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o "event\w*")
     for EVENT in $ALL_KEYB; do
         echo "$EVENT: STARTING"
-        ./spacefn /dev/input/$EVENT &
+        $SPACEFN /dev/input/$EVENT &
     done
     sleep 5
 
@@ -29,7 +32,7 @@ while true; do
         fi
         echo "$LINE"
         echo "$EVENT: STARTING '$KEYB'"
-        ./spacefn /dev/input/$EVENT &
+        $SPACEFN /dev/input/$EVENT &
         sleep 1
 
         # # KEYB=$(cat /proc/bus/input/devices | grep kbd | grep sysrq | grep -o %f)

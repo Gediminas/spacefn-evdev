@@ -65,7 +65,7 @@ unsigned int key_map_modifier(unsigned int code, int vendor) {
 
 unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
     switch (code) {
-        case KEY_BRIGHTNESSDOWN: exit(0);   // my magical escape button
+        case KEY_BRIGHTNESSDOWN: exit(0);   // some magical escape button?
 
         //case KEY_1:           *bSuper = true; return KEY_1;
         //case KEY_2:           *bSuper = true; return KEY_2;
@@ -81,33 +81,32 @@ unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, b
         //case KEY_EQUAL:       *bSuper = true; return KEY_EQUAL;
 
         case KEY_W:           *bCtrl = true; return KEY_S;
-        case KEY_E:           *bCtrl = true; return KEY_TAB;
-        case KEY_T:           return KEY_PAGEUP;
-        case KEY_G:           return KEY_PAGEDOWN;
-
-        //case KEY_A:           *bSuper = *bAlt = true; return KEY_A;
-        //case KEY_S:           *bSuper = *bAlt = true; return KEY_S;
-        //case KEY_D:           *bSuper = *bAlt = true; return KEY_D;
-        //case KEY_F:           *bSuper = *bAlt = true; return KEY_F;
+        //case KEY_E:           *bCtrl = true; return KEY_TAB;
+        //case KEY_T:           return KEY_PAGEUP;
+        //case KEY_G:           return KEY_PAGEDOWN;
 
         case KEY_X:           *bCtrl = true; return KEY_X;
         case KEY_C:           *bCtrl = true; return KEY_C;
         case KEY_V:           *bCtrl = true; return KEY_V;
 
-        case KEY_H:           return KEY_LEFT;
-        case KEY_J:           return KEY_DOWN;
-        case KEY_K:           return KEY_UP;
-        case KEY_L:           return KEY_RIGHT;
-        case KEY_B:           return KEY_ENTER;
-        case KEY_N:           return KEY_ESC;
-        case KEY_M:           return KEY_BACKSPACE;
+        case KEY_BACKSPACE:   return KEY_DELETE;
+        //case KEY_TAB:         *bSuper = true; return KEY_TAB;
+
         case KEY_Y:           return KEY_SPACE;
         case KEY_U:           *bCtrl = true; return KEY_LEFT;
         case KEY_I:           *bCtrl = true; return KEY_RIGHT;
         case KEY_O:           return KEY_HOME;
         case KEY_P:           return KEY_END;
-        case KEY_BACKSPACE:   return KEY_DELETE;
-        //case KEY_TAB:         *bSuper = true; return KEY_TAB;
+
+        case KEY_H:           return KEY_LEFT;
+        case KEY_J:           return KEY_DOWN;
+        case KEY_K:           return KEY_UP;
+        case KEY_L:           return KEY_RIGHT;
+
+        case KEY_B:           return KEY_ENTER;
+        case KEY_N:           return KEY_ESC;
+        case KEY_M:           return KEY_BACKSPACE;
+        case KEY_COMMA:       *bCtrl = true; return KEY_BACKSPACE;
     }
 
     *bSuper = true;
