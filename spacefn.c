@@ -48,23 +48,26 @@ static int _log(const char *format, ...) {
 }
 
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
-static unsigned int key_map_modifier(unsigned int code, int vendor) {
-    const bool bApple = (vendor == 1452 || vendor == 76);
+static unsigned int key_map_modifier(unsigned int code, bool is_apple) {
     //printf("%d => ", code);
     switch (code) {
-        case KEY_LEFTCTRL:  return KEY_LEFTMETA;
-        case KEY_LEFTALT:   return bApple ? KEY_LEFTALT  : KEY_LEFTCTRL;
-        case KEY_LEFTMETA:  return bApple ? KEY_LEFTCTRL : KEY_LEFTALT;
+        case KEY_LEFTCTRL:  return KEY_LEFTMETA;                         //Ctrl
+        case KEY_LEFTMETA:  return is_apple ? KEY_LEFTCTRL : KEY_LEFTALT;  //Win
+        case KEY_LEFTALT:   return is_apple ? KEY_LEFTALT  : KEY_LEFTCTRL; //Alt
+
         case KEY_RIGHTMETA: return KEY_RIGHTSHIFT; //Apple CMD
         case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
         case KEY_CAPSLOCK:  return KEY_ESC;
         case KEY_SYSRQ:     return KEY_RIGHTALT;   //ThinkPad PrtSc
+
+        //case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
+        //case KEY_CAPSLOCK:  return KEY_LEFTCTRL;
     }
     //printf("%d (%d)\n", code, KEY_SYSRQ);
     return code;
 }
 
-static unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
+static unsigned int key_map_spc(unsigned int code, int layer, bool is_apple, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
     switch (code) {
         case KEY_BRIGHTNESSDOWN: exit(0);   // some magical escape button?
 
@@ -83,8 +86,8 @@ static unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *
 
         case KEY_W:           *bCtrl = true; return KEY_S;
         //case KEY_E:           *bCtrl = true; return KEY_TAB;
-        //case KEY_T:           return KEY_PAGEUP;
-        //case KEY_G:           return KEY_PAGEDOWN;
+        case KEY_T:           return KEY_PAGEUP;
+        case KEY_G:           return KEY_PAGEDOWN;
 
         case KEY_X:           *bCtrl = true; return KEY_X;
         case KEY_C:           *bCtrl = true; return KEY_C;
@@ -114,7 +117,7 @@ static unsigned int key_map_spc(unsigned int code, int layer, int vendor, bool *
     return code;
 }
 
-unsigned int key_map_dot(unsigned int code, int layer, int vendor, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
+unsigned int key_map_dot(unsigned int code, int layer, bool is_apple, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
     switch (code) {
         case KEY_E:           return KEY_LEFTBRACE;
         case KEY_R:           return KEY_RIGHTBRACE;
@@ -141,7 +144,7 @@ unsigned int key_map_dot(unsigned int code, int layer, int vendor, bool *bAlt, b
     return 0;
 }
 
-unsigned int key_map(unsigned int code, int layer, int vendor, bool *bAlt,
+unsigned int key_map(unsigned int code, int layer, bool is_apple, bool *bAlt,
                      bool *bCtrl, bool *bShift, bool *bSuper) {
     unsigned int new_code = 0;
     *bAlt = false;
@@ -149,8 +152,8 @@ unsigned int key_map(unsigned int code, int layer, int vendor, bool *bAlt,
     *bShift = false;
     *bSuper = false;
     switch (layer) {
-        case LAYER_SPC: new_code = key_map_spc(code, layer, vendor, bAlt, bCtrl, bShift, bSuper); break;
-        case LAYER_DOT: new_code = key_map_dot(code, layer, vendor, bAlt, bCtrl, bShift, bSuper); break;
+        case LAYER_SPC: new_code = key_map_spc(code, layer, is_apple, bAlt, bCtrl, bShift, bSuper); break;
+        case LAYER_DOT: new_code = key_map_dot(code, layer, is_apple, bAlt, bCtrl, bShift, bSuper); break;
     }
     // printf("Mapped %d => %d [%c%c%c]\n", code, new_code, *bAlt ? 'A' : '-',
     // *bCtrl ? 'C' : '-', *bShift ? 'S' : '-');
@@ -224,7 +227,7 @@ static void print_event(struct input_event *ev) {
 }
 
 // input {{{2
-static int read_one_key(struct input_event *ev, int vendor) {
+static int read_one_key(struct input_event *ev, bool is_apple) {
     const int err = libevdev_next_event(idev, LIBEVDEV_READ_FLAG_NORMAL | LIBEVDEV_READ_FLAG_BLOCKING, ev);
     if (err) {
         fprintf(stderr, "Failed: (%d) %s\n", -err, strerror(err));
@@ -236,7 +239,7 @@ static int read_one_key(struct input_event *ev, int vendor) {
         return -1;
     }
 
-    ev->code = key_map_modifier(ev->code, vendor);
+    ev->code = key_map_modifier(ev->code, is_apple);
 
     if (blacklist(ev->code)) {
         return -1;
@@ -248,7 +251,7 @@ static int read_one_key(struct input_event *ev, int vendor) {
 // Change buffer from decide state raw keys to shift state mapped keys.
 // Just clearing the buffer on decide -> shift change can lead to presses without
 // a release sometimes and that can lock a laptop trackpad.
-static void fix_buffer(int layer, int vendor) {
+static void fix_buffer(int layer, bool is_apple) {
     unsigned int tbuffer[MAX_BUFFER];
     int moves = 0;
     for (int i=0; i<n_buffer; i++) {
@@ -256,7 +259,7 @@ static void fix_buffer(int layer, int vendor) {
         bool bCtrl = false;
         bool bShift = false;
         bool bSuper = false;
-        unsigned int code = key_map(buffer[i], layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
+        unsigned int code = key_map(buffer[i], layer, is_apple, &bAlt, &bCtrl, &bShift, &bSuper);
         if (!code) {
             code = buffer[i];
         } else {
@@ -277,10 +280,10 @@ static void fix_buffer(int layer, int vendor) {
 }
 
 
-static void state_idle(int vendor) {  // {{{2
+static void state_idle(bool is_apple) {  // {{{2
     struct input_event ev;
     for (;;) {
-        while (read_one_key(&ev, vendor));
+        while (read_one_key(&ev, is_apple));
 
         if (ev.code == KEY_SPACE && ev.value == V_PRESS) {
             state = DECIDE;
@@ -298,7 +301,7 @@ static void state_idle(int vendor) {  // {{{2
     }
 }
 
-static void state_decide(int vendor, int fd) {    // {{{2
+static void state_decide(bool is_apple, int fd) {    // {{{2
     n_buffer = 0;
     struct input_event ev;
     struct timeval timeout;
@@ -313,7 +316,7 @@ static void state_decide(int vendor, int fd) {    // {{{2
         if (!nfds)
             break;
 
-        while (read_one_key(&ev, vendor));
+        while (read_one_key(&ev, is_apple));
 
         if (ev.value == V_PRESS) {
             buffer_append(ev.code);
@@ -351,7 +354,7 @@ static void state_decide(int vendor, int fd) {    // {{{2
             bool bShift = false;
             bool bSuper = false;
 
-            const unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
+            const unsigned int code = key_map(ev.code, layer, is_apple, &bAlt, &bCtrl, &bShift, &bSuper);
 
             if (bAlt)   { send_key(KEY_LEFTALT,   V_PRESS); }
             if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
@@ -369,21 +372,21 @@ static void state_decide(int vendor, int fd) {    // {{{2
             if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_RELEASE); }
             if (bAlt)   { send_key(KEY_LEFTALT,   V_RELEASE); }
             state = SHIFT;
-            fix_buffer(layer, vendor);
+            fix_buffer(layer, is_apple);
             return;
         }
     }
 
     //printf("timed out\n");
-    fix_buffer(layer, vendor);
+    fix_buffer(layer, is_apple);
     state = SHIFT;
 }
 
-static void state_shift(int vendor) {
+static void state_shift(bool is_apple) {
     //n_buffer = 0;
     struct input_event ev;
     for (;;) {
-        while (read_one_key(&ev, vendor));
+        while (read_one_key(&ev, is_apple));
 
         if (ev.code == KEY_SPACE && ev.value == V_RELEASE) {
             for (int i=0; i<n_buffer; i++)
@@ -407,7 +410,7 @@ static void state_shift(int vendor) {
         bool bCtrl = false;
         bool bShift = false;
         bool bSuper = false;
-        unsigned int code = key_map(ev.code, layer, vendor, &bAlt, &bCtrl, &bShift, &bSuper);
+        unsigned int code = key_map(ev.code, layer, is_apple, &bAlt, &bCtrl, &bShift, &bSuper);
         // printf("SPACEcode3: %d - ctrl %d\n", code, bCtrl);
         if (code) {
             if (ev.value == V_PRESS) {
@@ -439,18 +442,18 @@ static void state_shift(int vendor) {
     }
 }
 
-static void run_state_machine(int fd, int vendor) {
+static void run_state_machine(int fd, bool is_apple) {
     for (;;) {
         //printf("state %d\n", state);
         switch (state) {
             case IDLE:
-                state_idle(vendor);
+                state_idle(is_apple);
                 break;
             case DECIDE:
-                state_decide(vendor, fd);
+                state_decide(is_apple, fd);
                 break;
             case SHIFT:
-                state_shift(vendor);
+                state_shift(is_apple);
                 break;
         }
     }
@@ -499,15 +502,20 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    const char* name    = libevdev_get_name(idev);
-    const int   vendor  = libevdev_get_id_vendor(idev);
-    const int   bustype = libevdev_get_id_bustype(idev);
-    const int   product = libevdev_get_id_product(idev);
-    const int   keeb    = is_keeb(idev);
-    const char* phys    = libevdev_get_phys(idev);
-    const char* uniq    = libevdev_get_uniq(idev);
-    
+    const char* name     = libevdev_get_name(idev);
+    const int   vendor   = libevdev_get_id_vendor(idev);
+    const int   bustype  = libevdev_get_id_bustype(idev);
+    const int   product  = libevdev_get_id_product(idev);
+    const int   keeb     = is_keeb(idev);
+    const char* phys     = libevdev_get_phys(idev);
+    const char* uniq     = libevdev_get_uniq(idev);
+    const bool  is_apple  = (NULL != strstr(name, "Apple")) ||
+                            (NULL != strstr(phys, "apple")) ||
+                            (vendor == 1452) ||
+                            (vendor == 76);
+
     _log("%s: %s, bus: %#x, vendor: %#x, product: %#x, phys: %s)\n", interface, name, bustype, vendor, product, phys);
+    _log("Is Apple keyboard? %s\n", is_apple ? "yes" : "no");
 
     if (!keeb) {
         fprintf(stderr, "This device does not look like a keyboard\n");
@@ -534,5 +542,5 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    run_state_machine(fd, vendor);
+    run_state_machine(fd, is_apple);
 }

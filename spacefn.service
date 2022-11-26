@@ -1,0 +1,8 @@
+[Unit]
+Description=SpaceFn script
+
+[Service]
+ExecStart=/home/gds/sub/spacefn-evdev/space
+
+[Install]
+WantedBy=multi-user.target
