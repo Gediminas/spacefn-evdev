@@ -1,4 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/sh
+
+# Workaround for NixOS to find inotifywait when used as service
+export PATH="/run/current-system/sw/bin/:$PATH"
 
 SPACEFN="${BASH_SOURCE[0]}fn"
 echo SpaceFn: $SPACEFN
