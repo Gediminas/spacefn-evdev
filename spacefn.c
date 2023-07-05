@@ -39,7 +39,7 @@ static int _log(const char *format, ...) {
     gettimeofday(&tmnow, NULL);
     tm = localtime(&tmnow.tv_sec);
     strftime(buf, 30, "%Y-%m-%d %H:%M:%S", tm);
-    printf("\e[0;37m%s.%d\e[0m ", buf, tmnow.tv_usec);
+    printf("\e[0;37m%s.%ld\e[0m ", buf, tmnow.tv_usec);
 
     va_list args;
     va_start(args, format);
@@ -85,7 +85,8 @@ static unsigned int key_map_spc(unsigned int code, int layer, bool is_apple, boo
         //case KEY_EQUAL:       *bSuper = true; return KEY_EQUAL;
 
         case KEY_W:           *bCtrl = true; return KEY_S;
-        //case KEY_E:           *bCtrl = true; return KEY_TAB;
+        // case KEY_Q:           *bCtrl = true; return KEY_S;
+        // case KEY_E:           *bCtrl = true; return KEY_TAB;
         case KEY_T:           return KEY_PAGEUP;
         case KEY_G:           return KEY_PAGEDOWN;
 
@@ -97,20 +98,38 @@ static unsigned int key_map_spc(unsigned int code, int layer, bool is_apple, boo
         //case KEY_TAB:         *bSuper = true; return KEY_TAB;
 
         case KEY_Y:           return KEY_SPACE;
-        case KEY_U:           *bCtrl = true; return KEY_LEFT;
-        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
-        case KEY_O:           return KEY_HOME;
+
+        // case KEY_U:           return KEY_LEFTSHIFT;
+        // case KEY_I:           return KEY_LEFTSHIFT;
+        // case KEY_O:           return KEY_LEFTSHIFT;
+        // case KEY_P:           return KEY_LEFTSHIFT;
+        case KEY_U:           return KEY_HOME;
+        case KEY_I:           *bCtrl = true; return KEY_LEFT;
+        case KEY_O:           *bCtrl = true; return KEY_RIGHT;
         case KEY_P:           return KEY_END;
+
+        case KEY_LEFTBRACE:   return KEY_PAGEDOWN;
+        case KEY_RIGHTBRACE:  return KEY_PAGEUP;
 
         case KEY_H:           return KEY_LEFT;
         case KEY_J:           return KEY_DOWN;
         case KEY_K:           return KEY_UP;
         case KEY_L:           return KEY_RIGHT;
 
-        case KEY_B:           return KEY_ENTER;
-        case KEY_N:           return KEY_ESC;
-        case KEY_M:           return KEY_BACKSPACE;
-        case KEY_COMMA:       *bCtrl = true; return KEY_BACKSPACE;
+        // case KEY_B:           return KEY_ENTER;
+        // case KEY_N:           return KEY_ESC;
+        // case KEY_COMMA:       *bCtrl = true; return KEY_BACKSPACE;
+        case KEY_B:           return KEY_LEFTSHIFT;
+        case KEY_N:           return KEY_LEFTSHIFT;
+        case KEY_M:           return KEY_LEFTSHIFT;
+        case KEY_COMMA:       return KEY_LEFTSHIFT;
+
+        // case KEY_SEMICOLON:   return KEY_LEFTSHIFT;
+        // case KEY_SEMICOLON:   return KEY_BACKSPACE;
+        case KEY_SEMICOLON:   return KEY_ENTER;
+
+        // case KEY_APOSTROPHE:  *bCtrl = true; return KEY_BACKSPACE;
+        case KEY_APOSTROPHE:  return KEY_LEFTSHIFT;
     }
 
     *bSuper = true;
