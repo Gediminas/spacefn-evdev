@@ -17,6 +17,12 @@
 #include <sys/dir.h>
 #include <unistd.h>
 
+#define V_RELEASE 0
+#define V_PRESS 1
+#define V_REPEAT 2
+
+const char symbol[] = {' ', 'P', 'R'};
+
 enum {
     IDLE,
     DECIDE,
@@ -26,7 +32,7 @@ enum {
 enum {
     LAYER_STD,
     LAYER_SPC,
-    LAYER_DOT,
+    // LAYER_DOT,
 } layer = LAYER_STD;
 
 struct libevdev *idev;
@@ -39,28 +45,29 @@ static int _log(const char *format, ...) {
     gettimeofday(&tmnow, NULL);
     tm = localtime(&tmnow.tv_sec);
     strftime(buf, 30, "%Y-%m-%d %H:%M:%S", tm);
-    printf("\e[0;37m%s.%ld\e[0m ", buf, tmnow.tv_usec);
+    printf("\033[0;34m%s.%03.0f\033[0m ", buf, (double)tmnow.tv_usec/1000);
 
     va_list args;
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
+    fflush(stdout);
 }
 
-// https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 static unsigned int key_map_modifier(unsigned int code, bool is_apple) {
-    //printf("%d => ", code);
+    // _log("mod key: %d => \n", code);
     switch (code) {
-        case KEY_LEFTCTRL:  return KEY_LEFTMETA;                         //Ctrl
-        case KEY_LEFTMETA:  return is_apple ? KEY_LEFTCTRL : KEY_LEFTALT;  //Win
-        case KEY_LEFTALT:   return is_apple ? KEY_LEFTALT  : KEY_LEFTCTRL; //Alt
+        // Tinkpad: Left:   Fn, Ctrl, Win, Alt   -->   Fn, Win, Alt, Ctrl
+        case KEY_LEFTCTRL:  return KEY_LEFTMETA;                           //LCtrl
+        case KEY_LEFTMETA:  return is_apple ? KEY_LEFTCTRL : KEY_LEFTALT;  //LWin
+        case KEY_LEFTALT:   return is_apple ? KEY_LEFTALT  : KEY_LEFTCTRL; //LAlt
 
+        // Tinkpad: Right:  Alt, PrnSc, Ctrl   -->  Shift, AltGr, Ctrl
         case KEY_RIGHTMETA: return KEY_RIGHTSHIFT; //Apple CMD
         case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
-        case KEY_CAPSLOCK:  return KEY_ESC;
         case KEY_SYSRQ:     return KEY_RIGHTALT;   //ThinkPad PrtSc
 
-        //case KEY_RIGHTALT:  return KEY_RIGHTSHIFT; //ThinkPad AltGr
+        case KEY_CAPSLOCK:  return KEY_ESC;
         //case KEY_CAPSLOCK:  return KEY_LEFTCTRL;
     }
     //printf("%d (%d)\n", code, KEY_SYSRQ);
@@ -68,6 +75,8 @@ static unsigned int key_map_modifier(unsigned int code, bool is_apple) {
 }
 
 static unsigned int key_map_spc(unsigned int code, int layer, bool is_apple, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
+    // https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
+
     switch (code) {
         case KEY_BRIGHTNESSDOWN: exit(0);   // some magical escape button?
 
@@ -83,85 +92,76 @@ static unsigned int key_map_spc(unsigned int code, int layer, bool is_apple, boo
         //case KEY_0:           *bSuper = true; return KEY_0;
         //case KEY_MINUS:       *bSuper = true; return KEY_MINUS;
         //case KEY_EQUAL:       *bSuper = true; return KEY_EQUAL;
-
-        case KEY_W:           *bCtrl = true; return KEY_S;
-        // case KEY_Q:           *bCtrl = true; return KEY_S;
-        // case KEY_E:           *bCtrl = true; return KEY_TAB;
-        case KEY_T:           return KEY_PAGEUP;
-        case KEY_G:           return KEY_PAGEDOWN;
+        // ref:
+        // KEY_0 KEY_9 KEY_MINUS KEY_EQUAL
+        // KEY_TAB KEY_PAGEDOWN KEY_PAGEUP
+        // KEY_ENTER KEY_ESC
 
         case KEY_X:           *bCtrl = true; return KEY_X;
         case KEY_C:           *bCtrl = true; return KEY_C;
         case KEY_V:           *bCtrl = true; return KEY_V;
 
-        case KEY_BACKSPACE:   return KEY_DELETE;
-        //case KEY_TAB:         *bSuper = true; return KEY_TAB;
+        // case KEY_DELETE:      *bCtrl = true; return KEY_DELETE;
+        case KEY_BACKSPACE:   *bCtrl = true; return KEY_BACKSPACE;
 
         case KEY_Y:           return KEY_SPACE;
-
-        // case KEY_U:           return KEY_LEFTSHIFT;
-        // case KEY_I:           return KEY_LEFTSHIFT;
-        // case KEY_O:           return KEY_LEFTSHIFT;
-        // case KEY_P:           return KEY_LEFTSHIFT;
         case KEY_U:           return KEY_HOME;
         case KEY_I:           *bCtrl = true; return KEY_LEFT;
         case KEY_O:           *bCtrl = true; return KEY_RIGHT;
         case KEY_P:           return KEY_END;
+        case KEY_LEFTBRACE:   return KEY_BACKSPACE; 
+        case KEY_RIGHTBRACE:  *bCtrl = true; return KEY_BACKSPACE;
 
-        case KEY_LEFTBRACE:   return KEY_PAGEDOWN;
-        case KEY_RIGHTBRACE:  return KEY_PAGEUP;
+        // case KEY_LEFTBRACE:   return KEY_PAGEDOWN;
+        // case KEY_RIGHTBRACE:  return KEY_PAGEUP;
+        // KEY_BACKSLASH
 
         case KEY_H:           return KEY_LEFT;
         case KEY_J:           return KEY_DOWN;
         case KEY_K:           return KEY_UP;
         case KEY_L:           return KEY_RIGHT;
-
-        // case KEY_B:           return KEY_ENTER;
-        // case KEY_N:           return KEY_ESC;
-        // case KEY_COMMA:       *bCtrl = true; return KEY_BACKSPACE;
-        case KEY_B:           return KEY_LEFTSHIFT;
-        case KEY_N:           return KEY_LEFTSHIFT;
-        case KEY_M:           return KEY_LEFTSHIFT;
-        case KEY_COMMA:       return KEY_LEFTSHIFT;
-
-        // case KEY_SEMICOLON:   return KEY_LEFTSHIFT;
-        // case KEY_SEMICOLON:   return KEY_BACKSPACE;
         case KEY_SEMICOLON:   return KEY_ENTER;
+        // KEY_APOSTROPHE
 
-        // case KEY_APOSTROPHE:  *bCtrl = true; return KEY_BACKSPACE;
-        case KEY_APOSTROPHE:  return KEY_LEFTSHIFT;
+        // case KEY_B:           return KEY_RESERVED;
+        // case KEY_N:           return KEY_RESERVED;
+        // case KEY_M:           return KEY_ESC; 
+        // case KEY_COMMA:       return KEY_BACKSPACE; 
+        // case KEY_DOT:         *bCtrl = true; return KEY_BACKSPACE;
+        // KEY_SLASH
     }
 
     *bSuper = true;
     return code;
 }
 
-unsigned int key_map_dot(unsigned int code, int layer, bool is_apple, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
-    switch (code) {
-        case KEY_E:           return KEY_LEFTBRACE;
-        case KEY_R:           return KEY_RIGHTBRACE;
+// unsigned int key_map_dot(unsigned int code, int layer, bool is_apple, bool *bAlt, bool *bCtrl, bool *bShift, bool *bSuper) {
+//     switch (code) {
+//         case KEY_E:           return KEY_LEFTBRACE;
+//         case KEY_R:           return KEY_RIGHTBRACE;
 
-        case KEY_D:           *bShift = true; return KEY_9;
-        case KEY_F:           *bShift = true; return KEY_0;
+//         case KEY_D:           *bShift = true; return KEY_9;
+//         case KEY_F:           *bShift = true; return KEY_0;
 
-        case KEY_X:           *bShift = true; return KEY_LEFTBRACE;
-        case KEY_C:           *bShift = true; return KEY_RIGHTBRACE;
+//         case KEY_X:           *bShift = true; return KEY_LEFTBRACE;
+//         case KEY_C:           *bShift = true; return KEY_RIGHTBRACE;
 
-        case KEY_H:           return KEY_LEFT;
-        case KEY_J:           return KEY_DOWN;
-        case KEY_K:           return KEY_UP;
-        case KEY_L:           return KEY_RIGHT;
-        case KEY_B:           return KEY_ENTER;
-        case KEY_N:           return KEY_ESC;
-        case KEY_M:           return KEY_BACKSPACE;
-        case KEY_Y:           return KEY_SPACE;
-        case KEY_U:           *bCtrl = true; return KEY_LEFT;
-        case KEY_I:           *bCtrl = true; return KEY_RIGHT;
-        case KEY_O:           return KEY_HOME;
-        case KEY_P:           return KEY_END;
-    }
-    return 0;
-}
+//         case KEY_H:           return KEY_LEFT;
+//         case KEY_J:           return KEY_DOWN;
+//         case KEY_K:           return KEY_UP;
+//         case KEY_L:           return KEY_RIGHT;
+//         case KEY_B:           return KEY_ENTER;
+//         case KEY_N:           return KEY_ESC;
+//         case KEY_M:           return KEY_BACKSPACE;
+//         case KEY_Y:           return KEY_SPACE;
+//         case KEY_U:           *bCtrl = true; return KEY_LEFT;
+//         case KEY_I:           *bCtrl = true; return KEY_RIGHT;
+//         case KEY_O:           return KEY_HOME;
+//         case KEY_P:           return KEY_END;
+
+//     }
+//     return 0;
+// }
 
 unsigned int key_map(unsigned int code, int layer, bool is_apple, bool *bAlt,
                      bool *bCtrl, bool *bShift, bool *bSuper) {
@@ -172,7 +172,7 @@ unsigned int key_map(unsigned int code, int layer, bool is_apple, bool *bAlt,
     *bSuper = false;
     switch (layer) {
         case LAYER_SPC: new_code = key_map_spc(code, layer, is_apple, bAlt, bCtrl, bShift, bSuper); break;
-        case LAYER_DOT: new_code = key_map_dot(code, layer, is_apple, bAlt, bCtrl, bShift, bSuper); break;
+        // case LAYER_DOT: new_code = key_map_dot(code, layer, is_apple, bAlt, bCtrl, bShift, bSuper); break;
     }
     // printf("Mapped %d => %d [%c%c%c]\n", code, new_code, *bAlt ? 'A' : '-',
     // *bCtrl ? 'C' : '-', *bShift ? 'S' : '-');
@@ -226,12 +226,6 @@ static int buffer_append(unsigned int code) {
     buffer[n_buffer++] = code;
     return 0;
 }
-
-// Key I/O functions {{{1
-// output {{{2
-#define V_RELEASE 0
-#define V_PRESS 1
-#define V_REPEAT 2
 
 static void send_key(unsigned int code, int value) {
     libevdev_uinput_write_event(odev, EV_KEY, code, value);
@@ -288,6 +282,7 @@ static void fix_buffer(int layer, bool is_apple) {
         if (bCtrl)  { send_key(KEY_LEFTCTRL,  V_PRESS); }
         if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
         if (bSuper) { send_key(KEY_LEFTMETA,  V_PRESS); }
+        // _log("key(fix): %d [%c]\n", code, symbol[V_PRESS]);
         send_key(code, V_PRESS);
         if (bSuper) { send_key(KEY_LEFTMETA,  V_RELEASE); }
         if (bShift) { send_key(KEY_LEFTSHIFT, V_RELEASE); }
@@ -310,12 +305,13 @@ static void state_idle(bool is_apple) {  // {{{2
             return;
         }
 
-        if (ev.code == KEY_DOT && ev.value == V_PRESS) {
-            state = DECIDE;
-            layer = LAYER_DOT;
-            return;
-        }
+        // if (ev.code == KEY_DOT && ev.value == V_PRESS) {
+        //     state = DECIDE;
+        //     layer = LAYER_DOT;
+        //     return;
+        // }
 
+        // _log("key(idl): %d [%c]\n", ev.code, symbol[ev.value]);
         send_key(ev.code, ev.value);
     }
 }
@@ -353,14 +349,14 @@ static void state_decide(bool is_apple, int fd) {    // {{{2
             return;
         }
 
-        if (ev.code == KEY_DOT && ev.value == V_RELEASE) {
-            send_key(KEY_DOT, V_PRESS);
-            send_key(KEY_DOT, V_RELEASE);
-            for (int i=0; i<n_buffer; i++)
-                send_key(buffer[i], V_PRESS);
-            state = IDLE;
-            return;
-        }
+        // if (ev.code == KEY_DOT && ev.value == V_RELEASE) {
+        //     send_key(KEY_DOT, V_PRESS);
+        //     send_key(KEY_DOT, V_RELEASE);
+        //     for (int i=0; i<n_buffer; i++)
+        //         send_key(buffer[i], V_PRESS);
+        //     state = IDLE;
+        //     return;
+        // }
 
         if (ev.value == V_RELEASE && !buffer_contains(ev.code)) {
             send_key(ev.code, ev.value);
@@ -380,9 +376,11 @@ static void state_decide(bool is_apple, int fd) {    // {{{2
             if (bShift) { send_key(KEY_LEFTSHIFT, V_PRESS); }
             if (bSuper) { send_key(KEY_LEFTMETA,  V_PRESS); }
             if (code) {
+                // _log("key(dc1): %d\n", code);
                 send_key(code, V_PRESS);
                 send_key(code, V_RELEASE);
             } else {
+                // _log("key(dc2): %d '%c'\n", ev.code, ev.code);
                 send_key(ev.code, V_PRESS);
                 send_key(ev.code, V_RELEASE);
             }
@@ -416,14 +414,14 @@ static void state_shift(bool is_apple) {
         if (ev.code == KEY_SPACE)
             continue;
 
-        if (ev.code == KEY_DOT && ev.value == V_RELEASE) {
-            for (int i=0; i<n_buffer; i++)
-                send_key(buffer[i], V_RELEASE);
-            state = IDLE;
-            return;
-        }
-        if (ev.code == KEY_DOT)
-            continue;
+        // if (ev.code == KEY_DOT && ev.value == V_RELEASE) {
+        //     for (int i=0; i<n_buffer; i++)
+        //         send_key(buffer[i], V_RELEASE);
+        //     state = IDLE;
+        //     return;
+        // }
+        // if (ev.code == KEY_DOT)
+        //     continue;
 
         bool bAlt = false;
         bool bCtrl = false;
@@ -446,6 +444,7 @@ static void state_shift(bool is_apple) {
                 if (bSuper) { send_key(KEY_LEFTMETA,  V_PRESS); }
             }
 
+            // _log("key(shf): %d [%c]\n", code, symbol[ev.value]);
             send_key(code, ev.value);
 
             if (ev.value == V_PRESS) {
